@@ -2205,6 +2205,31 @@
       ].join("\n");
     }
 
+    function depositPaymentMessage(record) {
+      return [
+        "预约定金收款信息：",
+        `客人：${record.client || "待填写"}`,
+        `项目：${record.service || "待确认"}`,
+        "金额：$10",
+        "",
+        "NAME: ZHU Q",
+        "BSB: 013132",
+        "ACCOUNT: 436090844",
+        "",
+        "付款后请截图发我确认档期 💗"
+      ].join("\n");
+    }
+
+    async function showDepositPaymentInfo(record) {
+      const text = depositPaymentMessage(record);
+      try {
+        await navigator.clipboard.writeText(text);
+        window.prompt("收款信息已复制，可以直接发给客人：", text);
+      } catch {
+        window.prompt("复制这段收款信息发给客人：", text);
+      }
+    }
+
     async function copyText(text, successText) {
       try {
         await navigator.clipboard.writeText(text);
@@ -2257,11 +2282,14 @@
     }
 
     function markDeposit(id) {
+      let updatedRecord = null;
       state.records = state.records.map(record => {
         if (record.id !== id) return record;
-        return { ...record, status: "deposit", deposit: Math.max(toNumber(record.deposit), 10), updatedAt: new Date().toISOString() };
+        updatedRecord = { ...record, status: "deposit", deposit: Math.max(toNumber(record.deposit), 10), updatedAt: new Date().toISOString() };
+        return updatedRecord;
       });
       render();
+      if (updatedRecord) showDepositPaymentInfo(updatedRecord);
     }
 
     function markPaid(id) {
