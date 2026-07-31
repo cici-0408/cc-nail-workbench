@@ -1604,8 +1604,8 @@
               <input id="price" name="price" type="number" min="0" step="0.01" placeholder="0">
             </div>
             <div class="field">
-              <label for="discount">折扣金额</label>
-              <input id="discount" name="discount" type="number" min="0" step="0.01" placeholder="0">
+              <label for="discount">折扣（几折）</label>
+              <input id="discount" name="discount" type="number" min="0" max="10" step="0.1" placeholder="如 8 = 8折">
             </div>
           </div>
           <div class="grid-2">
@@ -1630,7 +1630,7 @@
             <button class="pill-button primary" type="submit" id="submitButton">保存预约</button>
             <button class="icon-button" type="button" id="clearButton" title="清空表单">×</button>
           </div>
-          <p class="hint">营业额按“原价 - 折扣金额”计算；未付款预约会保留在列表中，但不计入已收营业额。</p>
+          <p class="hint">营业额按“原价 × 几折”计算；不填或填 10 代表原价。未付款预约会保留在列表中，但不计入已收营业额。</p>
         </form>
       </section>
 
@@ -1759,7 +1759,9 @@
     }
 
     function finalAmount(record) {
-      return Math.max(0, toNumber(record.price) - toNumber(record.discount));
+      const discount = toNumber(record.discount);
+      const rate = discount > 0 && discount < 10 ? discount / 10 : 1;
+      return Math.max(0, toNumber(record.price) * rate);
     }
 
     function paidAmount(record) {
@@ -2156,7 +2158,8 @@
       els.recordsList.innerHTML = records.map(record => {
         const actual = finalAmount(record);
         const paid = paidAmount(record);
-        const discountText = toNumber(record.discount) ? `优惠 ${money.format(record.discount)}` : "无折扣";
+        const discount = toNumber(record.discount);
+        const discountText = discount > 0 && discount < 10 ? `${discount}折` : "无折扣";
         const phoneText = record.phone ? ` · ${escapeHtml(record.phone)}` : "";
         const notes = record.notes ? `<p>${escapeHtml(record.notes)}</p>` : "";
         return `
