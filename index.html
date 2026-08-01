@@ -465,13 +465,14 @@
           <label for="notes">款式/预算/备注</label>
           <textarea id="notes" rows="4" placeholder="可以写想做的颜色、款式、预算，或提醒我你会发参考图"></textarea>
         </div>
-        <button class="primary" id="copyRequest" type="button">生成预约信息</button>
-        <p class="hint">点按钮后会复制一段预约信息，你可以直接发给 Cc Nail。</p>
+        <button class="primary" id="copyRequest" type="button">提交预约信息</button>
+        <p class="hint" id="submitHint">提交后 Cc Nail 会在后台看到；如果网络同步未开启，会自动复制预约信息。</p>
       </div>
     </section>
   </main>
 
   <script>
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const ids = id => document.getElementById(id);
 
@@ -519,12 +520,54 @@
       ].join("\n");
     }
 
+    function requestPayload() {
+      return {
+        name: ids("name").value || "",
+        contact: ids("contact").value || "",
+        date: ids("date").value || "",
+        time: ids("time").value || "",
+        service: ids("service").value || "",
+        notes: ids("notes").value || "",
+        quoteTotal: ids("quoteTotal").textContent,
+        quoteDeposit: ids("quoteDeposit").textContent,
+        quoteBalance: ids("quoteBalance").textContent
+      };
+    }
+
+    async function submitRequest() {
+      const payload = requestPayload();
+      if (!payload.name || !payload.contact || !payload.date) {
+        alert("请先填写姓名、微信/电话和想约日期。");
+        return;
+      }
+      if (!GOOGLE_SCRIPT_URL) {
+        await copyText(requestText());
+        return;
+      }
+      const button = ids("copyRequest");
+      button.disabled = true;
+      button.textContent = "提交中...";
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: new URLSearchParams(payload)
+        });
+        alert("预约信息已提交，Cc Nail 会尽快确认档期。");
+      } catch {
+        await copyText(requestText());
+      } finally {
+        button.disabled = false;
+        button.textContent = "提交预约信息";
+      }
+    }
+
     ["quoteBase", "quoteStyle", "quoteDecor", "quoteRemoval"].forEach(id => {
       ids(id).addEventListener("input", updateQuote);
       ids(id).addEventListener("change", updateQuote);
     });
     ids("date").value = todayISO();
-    ids("copyRequest").addEventListener("click", () => copyText(requestText()));
+    ids("copyRequest").addEventListener("click", submitRequest);
     updateQuote();
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js");
