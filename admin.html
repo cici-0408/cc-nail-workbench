@@ -459,6 +459,45 @@
       word-break: break-word;
     }
 
+    .assistant-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 0 0 18px;
+    }
+
+    .assistant-card {
+      min-height: 118px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fffafd, #fff);
+      box-shadow: 0 12px 28px rgba(166, 82, 118, 0.08);
+    }
+
+    .assistant-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .assistant-card strong {
+      display: block;
+      margin: 8px 0 6px;
+      color: var(--cherry);
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .assistant-card small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
     .layout {
       display: grid;
       grid-template-columns: 380px minmax(0, 1fr);
@@ -1026,6 +1065,10 @@
         grid-template-columns: repeat(2, 1fr);
       }
 
+      .assistant-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
       .layout,
       .notice-layout,
       .desk-grid {
@@ -1097,6 +1140,7 @@
       }
 
       .stats,
+      .assistant-grid,
       .grid-2 {
         grid-template-columns: 1fr;
       }
@@ -1487,6 +1531,29 @@
       </div>
     </section>
 
+    <section class="assistant-grid" aria-label="经营小助手" id="adminAssistant">
+      <div class="assistant-card">
+        <span>今日空位</span>
+        <strong id="slotAssistant">可预约</strong>
+        <small id="slotAssistantHint">一天只接一位，自动按预约记录判断。</small>
+      </div>
+      <div class="assistant-card">
+        <span>定金截图</span>
+        <strong id="proofAssistant">0 张</strong>
+        <small id="proofAssistantHint">客户上传截图后会出现在收件箱。</small>
+      </div>
+      <div class="assistant-card">
+        <span>待收尾款</span>
+        <strong id="balanceAssistant">$0</strong>
+        <small id="balanceAssistantHint">已收定金但还没结清的金额。</small>
+      </div>
+      <div class="assistant-card">
+        <span>数据备份</span>
+        <strong id="backupAssistant">本地+Google</strong>
+        <small id="backupAssistantHint">换设备前建议导出备份，客户提交走 Google。</small>
+      </div>
+    </section>
+
     <section class="panel admin-focus" aria-label="今日待办">
       <div class="panel-head">
         <h2>今日待办</h2>
@@ -1784,6 +1851,14 @@
       monthRevenue: document.querySelector("#monthRevenue"),
       totalRevenue: document.querySelector("#totalRevenue"),
       unpaidRevenue: document.querySelector("#unpaidRevenue"),
+      slotAssistant: document.querySelector("#slotAssistant"),
+      slotAssistantHint: document.querySelector("#slotAssistantHint"),
+      proofAssistant: document.querySelector("#proofAssistant"),
+      proofAssistantHint: document.querySelector("#proofAssistantHint"),
+      balanceAssistant: document.querySelector("#balanceAssistant"),
+      balanceAssistantHint: document.querySelector("#balanceAssistantHint"),
+      backupAssistant: document.querySelector("#backupAssistant"),
+      backupAssistantHint: document.querySelector("#backupAssistantHint"),
       adminTasks: document.querySelector("#adminTasks"),
       adminTaskSummary: document.querySelector("#adminTaskSummary"),
       cloudInboxList: document.querySelector("#cloudInboxList"),
@@ -2124,6 +2199,30 @@
       els.monthRevenue.textContent = money.format(sum(monthRecords));
       els.totalRevenue.textContent = money.format(sum(state.records));
       els.unpaidRevenue.textContent = money.format(sum(state.records, outstandingAmount));
+    }
+
+    function cloudHasDepositProof(item) {
+      return Boolean(item.paymentProof || item.paymentProofName || String(item.notes || "").includes("已上传定金截图"));
+    }
+
+    function renderAdminAssistant() {
+      const today = todayISO();
+      const todayRecords = state.records.filter(record => record.date === today);
+      const cloudTodayTaken = state.cloudInquiries.some(item => item.date === today && !String(item.notes || "").includes("后台预约占位"));
+      const isFull = todayRecords.length > 0 || cloudTodayTaken;
+      const proofCount = state.cloudInquiries.filter(cloudHasDepositProof).length;
+      const depositRecords = state.records.filter(record => record.status === "deposit");
+      const depositBalance = sum(depositRecords, outstandingAmount);
+      const lastBackup = localStorage.getItem("ccNail.lastBackupAt");
+
+      els.slotAssistant.textContent = isFull ? "今日已满" : "今日可约";
+      els.slotAssistantHint.textContent = isFull ? "客户页会提示今天没空位。" : "客户页还能预约今天 13:00-17:00。";
+      els.proofAssistant.textContent = `${proofCount} 张`;
+      els.proofAssistantHint.textContent = proofCount ? "刷新收件箱后可加入账本查看。" : "还没有新的付款截图。";
+      els.balanceAssistant.textContent = money.format(depositBalance);
+      els.balanceAssistantHint.textContent = depositRecords.length ? `${depositRecords.length} 位客人已付定金，待收尾款。` : "当前没有待收尾款。";
+      els.backupAssistant.textContent = state.records.length ? `${state.records.length} 条记录` : "未开始";
+      els.backupAssistantHint.textContent = lastBackup ? `上次导出：${lastBackup}` : "建议每周点一次“导出备份”。";
     }
 
     function renderCalendar() {
@@ -2540,6 +2639,7 @@
 
     function render() {
       renderStats();
+      renderAdminAssistant();
       renderAdminTasks();
       renderCloudInbox();
       renderCalendar();
@@ -2622,6 +2722,8 @@
       link.download = `美甲工作台备份-${todayISO()}.json`;
       link.click();
       URL.revokeObjectURL(link.href);
+      localStorage.setItem("ccNail.lastBackupAt", todayISO());
+      renderAdminAssistant();
     }
 
     function importBackup(file) {
