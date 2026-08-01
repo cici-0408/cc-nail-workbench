@@ -72,8 +72,7 @@
     }
 
     body.admin-only .mobile-tabs,
-    body.admin-only #customerView,
-    body.admin-only #noticeEditor {
+    body.admin-only #customerView {
       display: none !important;
     }
 
@@ -192,6 +191,24 @@
 
     .admin-main {
       min-width: 0;
+    }
+
+    .admin-main > section {
+      display: none;
+    }
+
+    .admin-main[data-page="adminHome"] > [data-admin-page~="adminHome"],
+    .admin-main[data-page="bookingManagement"] > [data-admin-page~="bookingManagement"],
+    .admin-main[data-page="scheduleBoard"] > [data-admin-page~="scheduleBoard"],
+    .admin-main[data-page="incomeBoard"] > [data-admin-page~="incomeBoard"],
+    .admin-main[data-page="statsBoard"] > [data-admin-page~="statsBoard"],
+    .admin-main[data-page="adminSettings"] > [data-admin-page~="adminSettings"] {
+      display: grid;
+    }
+
+    .admin-main[data-page="incomeBoard"] .schedule-panel,
+    .admin-main[data-page="scheduleBoard"] .income-panel {
+      display: none;
     }
 
     .hero {
@@ -1628,17 +1645,17 @@
             <strong>Cc Nail</strong>
             <span>Nail Studio</span>
           </div>
-          <a class="side-link active" data-icon="🏠" href="#adminHome">工作台首页</a>
-          <a class="side-link" data-icon="📒" href="#bookingManagement">预约管理</a>
-          <a class="side-link" data-icon="📅" href="#scheduleBoard">日程</a>
-          <a class="side-link" data-icon="💰" href="#incomeBoard">收入管理</a>
-          <a class="side-link" data-icon="📊" href="#statsBoard">统计</a>
-          <a class="side-link" data-icon="⚙" href="#adminSettings">设置</a>
+          <a class="side-link active" data-icon="🏠" data-page="adminHome" href="#adminHome">工作台首页</a>
+          <a class="side-link" data-icon="📒" data-page="bookingManagement" href="#bookingManagement">预约管理</a>
+          <a class="side-link" data-icon="📅" data-page="scheduleBoard" href="#scheduleBoard">日程</a>
+          <a class="side-link" data-icon="💰" data-page="incomeBoard" href="#incomeBoard">收入管理</a>
+          <a class="side-link" data-icon="📊" data-page="statsBoard" href="#statsBoard">统计</a>
+          <a class="side-link" data-icon="⚙" data-page="adminSettings" href="#adminSettings">设置</a>
         </aside>
 
-        <div class="admin-main">
+        <div class="admin-main" data-page="adminHome">
 
-    <section class="toolbar" aria-label="工作台设置" id="adminSettings">
+    <section class="toolbar" aria-label="工作台设置" id="adminSettings" data-admin-page="adminSettings">
       <div class="mode-toggle" aria-label="记录模式">
         <button id="dailyMode" type="button">每日重置</button>
         <button id="totalMode" type="button">累积记录</button>
@@ -1655,7 +1672,7 @@
       </div>
     </section>
 
-    <section class="stats" aria-label="营业统计" id="statsBoard">
+    <section class="stats" aria-label="营业统计" id="statsBoard" data-admin-page="statsBoard">
       <div class="stat">
         <span>今日预约</span>
         <strong id="todayCount">0 单</strong>
@@ -1682,7 +1699,7 @@
       </div>
     </section>
 
-    <section class="assistant-grid" aria-label="经营小助手" id="adminHome">
+    <section class="assistant-grid" aria-label="经营小助手" id="adminHome" data-admin-page="adminHome">
       <div class="assistant-card">
         <span>今日空位</span>
         <strong id="slotAssistant">可预约</strong>
@@ -1705,7 +1722,7 @@
       </div>
     </section>
 
-    <section class="panel admin-focus" aria-label="今日待办">
+    <section class="panel admin-focus" aria-label="今日待办" data-admin-page="adminHome">
       <div class="panel-head">
         <h2>今日待办</h2>
         <span class="status" id="adminTaskSummary">0 项</span>
@@ -1713,7 +1730,7 @@
       <div class="task-list" id="adminTasks"></div>
     </section>
 
-    <section class="panel admin-focus" aria-label="Google 客户提交收件箱">
+    <section class="panel admin-focus" aria-label="Google 客户提交收件箱" data-admin-page="adminHome">
       <div class="panel-head">
         <h2>客户提交收件箱</h2>
         <span class="status" id="cloudInboxSummary">未连接 Google</span>
@@ -1722,8 +1739,8 @@
       <div class="task-list" id="cloudInboxList"></div>
     </section>
 
-    <section class="desk-grid" aria-label="工作台总览" id="scheduleBoard">
-      <section class="panel" aria-label="月历预约板">
+    <section class="desk-grid" aria-label="工作台总览" id="scheduleBoard" data-admin-page="scheduleBoard incomeBoard">
+      <section class="panel schedule-panel" aria-label="月历预约板">
         <div class="panel-head">
           <h2>月历预约板</h2>
           <span class="status" id="calendarSummary">本月 0 单</span>
@@ -1738,7 +1755,7 @@
         </div>
       </section>
 
-      <div class="side-stack">
+      <div class="side-stack income-panel" id="incomeBoard">
         <section class="panel" aria-label="客户小账本" id="incomeBoard">
           <div class="panel-head">
             <h2>客户小账本</h2>
@@ -1757,7 +1774,7 @@
       </div>
     </section>
 
-    <section class="notice-layout" id="noticeEditor" aria-label="预约须知网站">
+    <section class="notice-layout" id="noticeEditor" aria-label="预约须知网站" data-admin-page="adminSettings">
       <section class="panel" aria-label="编辑预约须知">
         <div class="panel-head">
           <h2>预约须知网站</h2>
@@ -1825,7 +1842,7 @@
       </section>
     </section>
 
-    <section class="layout" id="bookingManagement">
+    <section class="layout" id="bookingManagement" data-admin-page="bookingManagement">
       <section class="panel" aria-label="新增预约">
         <div class="panel-head">
           <h2 id="formTitle">新增预约</h2>
@@ -1944,6 +1961,7 @@
     const STORAGE_KEY = "personalNailWorkbench.v1";
     const PREF_KEY = "personalNailWorkbench.preferences.v1";
     const NOTICE_KEY = "personalNailWorkbench.notice.v1";
+    const DISMISSED_CLOUD_KEY = "personalNailWorkbench.dismissedCloud.v1";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const APPOINTMENT_DEFAULT_TIME = "13:00";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
@@ -1966,6 +1984,17 @@
       editingId: null,
       calendarMonth: ""
     };
+
+    function loadDismissedCloudKeys() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(DISMISSED_CLOUD_KEY) || "[]");
+        return new Set(Array.isArray(saved) ? saved : []);
+      } catch {
+        return new Set();
+      }
+    }
+
+    const dismissedCloudKeys = loadDismissedCloudKeys();
 
     const els = {
       customerTab: document.querySelector("#customerTab"),
@@ -2517,6 +2546,10 @@
       return new Set(state.records.map(record => String(record.cloudId || "")));
     }
 
+    function saveDismissedCloudKeys() {
+      localStorage.setItem(DISMISSED_CLOUD_KEY, JSON.stringify([...dismissedCloudKeys]));
+    }
+
     function renderCloudInbox() {
       if (!els.cloudInboxList) return;
       if (!GOOGLE_SCRIPT_URL) {
@@ -2525,7 +2558,7 @@
         return;
       }
       const imported = importedCloudKeys();
-      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)) && !String(item.notes || "").includes("后台预约占位"));
+      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)) && !dismissedCloudKeys.has(cloudKey(item)) && !String(item.notes || "").includes("后台预约占位"));
       els.cloudInboxSummary.textContent = `${pending.length} 条待确认`;
       if (!pending.length) {
         els.cloudInboxList.innerHTML = `<div class="empty">暂无新的客户提交。点“刷新客户提交”检查 Google 表格。</div>`;
@@ -2548,10 +2581,21 @@
             ${paymentProof}
             <div class="task-actions">
               <button class="tiny" type="button" data-action="importCloud" data-id="${escapeHtml(key)}">加入账本</button>
+              <button class="tiny" type="button" data-action="deleteCloud" data-id="${escapeHtml(key)}">删除</button>
             </div>
           </article>
         `;
       }).join("");
+    }
+
+    function deleteCloudInquiry(id) {
+      if (!id) return;
+      if (!confirm("确定从收件箱删除这条客户提交吗？")) return;
+      dismissedCloudKeys.add(id);
+      saveDismissedCloudKeys();
+      state.cloudInquiries = state.cloudInquiries.filter(item => cloudKey(item) !== id);
+      renderCloudInbox();
+      renderAdminAssistant();
     }
 
     function jsonp(url) {
@@ -2939,14 +2983,25 @@
       reader.readAsText(file);
     }
 
+    function showAdminPage(page = "adminHome") {
+      const target = document.querySelector(`.side-link[data-page="${page}"]`) ? page : "adminHome";
+      document.querySelector(".admin-main").dataset.page = target;
+      document.querySelectorAll(".side-link").forEach(link => {
+        link.classList.toggle("active", link.dataset.page === target);
+      });
+      if (location.hash !== `#${target}`) {
+        history.replaceState(null, "", `#${target}`);
+      }
+    }
+
     els.dailyMode.addEventListener("click", () => setMode("daily"));
     els.totalMode.addEventListener("click", () => setMode("total"));
     els.customerTab.addEventListener("click", () => setView("customer"));
     els.adminTab.addEventListener("click", () => setView("admin"));
     document.querySelectorAll(".side-link").forEach(link => {
-      link.addEventListener("click", () => {
-        document.querySelectorAll(".side-link").forEach(item => item.classList.remove("active"));
-        link.classList.add("active");
+      link.addEventListener("click", event => {
+        event.preventDefault();
+        showAdminPage(link.dataset.page);
       });
     });
     els.selectedDate.addEventListener("change", () => {
@@ -3080,9 +3135,10 @@
     });
     els.refreshCloudInbox.addEventListener("click", refreshCloudInbox);
     els.cloudInboxList.addEventListener("click", event => {
-      const button = event.target.closest("button[data-action='importCloud']");
+      const button = event.target.closest("button[data-action]");
       if (!button) return;
-      importCloudInquiry(button.dataset.id);
+      if (button.dataset.action === "importCloud") importCloudInquiry(button.dataset.id);
+      if (button.dataset.action === "deleteCloud") deleteCloudInquiry(button.dataset.id);
     });
     els.exportButton.addEventListener("click", exportBackup);
     els.importButton.addEventListener("click", () => els.importFile.click());
@@ -3094,6 +3150,7 @@
 
     loadAll();
     loadNotice();
+    showAdminPage(location.hash ? location.hash.slice(1) : "adminHome");
     resetForm();
     resetInquiryForm();
     updateQuote();
