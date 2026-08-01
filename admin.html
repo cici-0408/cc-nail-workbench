@@ -1644,17 +1644,21 @@
           </div>
           <div class="grid-2">
             <div class="field">
+              <label for="extraFee">另加费用（钻/饰品/其他）</label>
+              <input id="extraFee" name="extraFee" type="number" min="0" step="0.01" placeholder="0">
+            </div>
+            <div class="field">
               <label for="deposit">定金</label>
               <input id="deposit" name="deposit" type="number" min="0" step="0.01" placeholder="0">
             </div>
-            <div class="field">
-              <label for="status">付款状态</label>
-              <select id="status" name="status">
-                <option value="paid">已付款</option>
-                <option value="unpaid">未付款</option>
-                <option value="deposit">已付定金</option>
-              </select>
-            </div>
+          </div>
+          <div class="field">
+            <label for="status">付款状态</label>
+            <select id="status" name="status">
+              <option value="paid">已付款</option>
+              <option value="unpaid">未付款</option>
+              <option value="deposit">已付定金</option>
+            </select>
           </div>
           <div class="field">
             <label for="notes">备注</label>
@@ -1669,7 +1673,7 @@
             <button class="pill-button primary" type="submit" id="submitButton">保存预约</button>
             <button class="icon-button" type="button" id="clearButton" title="清空表单">×</button>
           </div>
-          <p class="hint">营业额按“原价 × 几折”计算；不填或填 10 代表原价。未付款预约会保留在列表中，但不计入已收营业额。</p>
+          <p class="hint">营业额按“原价 × 几折 + 另加费用”计算；不填折扣或填 10 代表原价。未付款预约会保留在列表中，但不计入已收营业额。</p>
         </form>
       </section>
 
@@ -1807,7 +1811,7 @@
     function finalAmount(record) {
       const discount = toNumber(record.discount);
       const rate = discount > 0 && discount < 10 ? discount / 10 : 1;
-      return Math.max(0, toNumber(record.price) * rate);
+      return Math.max(0, toNumber(record.price) * rate + toNumber(record.extraFee));
     }
 
     function paidAmount(record) {
@@ -1950,6 +1954,7 @@
         service: form.get("service"),
         price: toNumber(form.get("price")),
         discount: toNumber(form.get("discount")),
+        extraFee: toNumber(form.get("extraFee")),
         deposit: toNumber(form.get("deposit")),
         status: form.get("status"),
         notes: String(form.get("notes") || "").trim(),
@@ -2291,6 +2296,45 @@
       });
     }
 
+    function customerStatusText(record) {
+      if (record.status === "paid") return "已确认，已收全款";
+      if (record.status === "deposit") return "已确认，已收定金";
+      return "Cc Nail 已收到，正在确认价格和档期";
+    }
+
+    function cloudRecordPayload(record) {
+      const final = finalAmount(record);
+      const paid = paidAmount(record);
+      return {
+        action: "updateStatus",
+        id: record.cloudId || "",
+        name: record.client || "",
+        contact: record.phone || "",
+        date: record.date || "",
+        time: record.time || "",
+        service: record.service || "",
+        notes: record.notes || "",
+        status: record.status || "unpaid",
+        statusText: customerStatusText(record),
+        finalTotal: money.format(final),
+        depositReceived: money.format(paid),
+        finalBalance: money.format(Math.max(0, final - paid)),
+        adminNote: record.status === "unpaid" ? "已收到信息，价格和档期确认后会更新。" : "预约信息已更新。",
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    async function syncCloudRecord(record) {
+      if (!GOOGLE_SCRIPT_URL || !record?.cloudId) return;
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: new URLSearchParams(cloudRecordPayload(record))
+        });
+      } catch {}
+    }
+
     async function refreshCloudInbox() {
       if (!GOOGLE_SCRIPT_URL) {
         alert("还没有连接 Google 表格。先按我给你的步骤生成 Web App 链接。");
@@ -2324,6 +2368,7 @@
         service,
         price: serviceBasePrice(service),
         discount: 0,
+        extraFee: 0,
         deposit: 0,
         status: "unpaid",
         notes: `Google客户提交：${item.notes || "待确认款式和价格"}${item.quoteTotal ? `｜估算 ${item.quoteTotal}` : ""}`,
@@ -2333,6 +2378,7 @@
       els.selectedDate.value = record.date;
       state.calendarMonth = record.date.slice(0, 7);
       render();
+      syncCloudRecord(record);
       alert("已加入预约，可以继续确认定金或修改价格。");
     }
 
@@ -2349,7 +2395,9 @@
         const actual = finalAmount(record);
         const paid = paidAmount(record);
         const discount = toNumber(record.discount);
+        const extraFee = toNumber(record.extraFee);
         const discountText = discount > 0 && discount < 10 ? `${discount}折` : "无折扣";
+        const extraFeeText = extraFee > 0 ? ` · 另加 ${money.format(extraFee)}` : "";
         const phoneText = record.phone ? ` · ${escapeHtml(record.phone)}` : "";
         const notes = record.notes ? `<p>${escapeHtml(record.notes)}</p>` : "";
         const styleImage = record.styleImage ? `<img class="style-thumb" src="${record.styleImage}" alt="款式图片">` : "";
@@ -2358,7 +2406,7 @@
             <div class="time">${escapeHtml(record.date.slice(5))}<br>${escapeHtml(record.time || "--:--")}</div>
             <div>
               <h3>${escapeHtml(record.client)}${phoneText}</h3>
-              <p>${escapeHtml(record.service)} · 原价 ${money.format(record.price)} · ${discountText}</p>
+              <p>${escapeHtml(record.service)} · 原价 ${money.format(record.price)} · ${discountText}${extraFeeText}</p>
               ${notes}
             </div>
             ${styleImage}
@@ -2471,11 +2519,14 @@
     }
 
     function togglePaid(id) {
+      let updatedRecord = null;
       state.records = state.records.map(record => {
         if (record.id !== id) return record;
-        return { ...record, status: record.status === "paid" ? "unpaid" : "paid", updatedAt: new Date().toISOString() };
+        updatedRecord = { ...record, status: record.status === "paid" ? "unpaid" : "paid", updatedAt: new Date().toISOString() };
+        return updatedRecord;
       });
       render();
+      syncCloudRecord(updatedRecord);
     }
 
     function markDeposit(id) {
@@ -2486,15 +2537,21 @@
         return updatedRecord;
       });
       render();
-      if (updatedRecord) showDepositPaymentInfo(updatedRecord);
+      if (updatedRecord) {
+        syncCloudRecord(updatedRecord);
+        showDepositPaymentInfo(updatedRecord);
+      }
     }
 
     function markPaid(id) {
+      let updatedRecord = null;
       state.records = state.records.map(record => {
         if (record.id !== id) return record;
-        return { ...record, status: "paid", deposit: finalAmount(record), updatedAt: new Date().toISOString() };
+        updatedRecord = { ...record, status: "paid", deposit: finalAmount(record), updatedAt: new Date().toISOString() };
+        return updatedRecord;
       });
       render();
+      syncCloudRecord(updatedRecord);
     }
 
     function exportBackup() {
@@ -2527,6 +2584,7 @@
             service: record.service || "其他",
             price: toNumber(record.price),
             discount: toNumber(record.discount),
+            extraFee: toNumber(record.extraFee),
             deposit: toNumber(record.deposit),
             status: record.status || "unpaid",
             notes: record.notes || "",
@@ -2607,6 +2665,7 @@
         service,
         price: serviceBasePrice(service),
         discount: 0,
+        extraFee: 0,
         deposit: 0,
         status: "unpaid",
         notes: `客户预约/问价：${note || "待确认款式和价格"}`,
@@ -2645,6 +2704,7 @@
       els.selectedDate.value = record.date;
       resetForm();
       render();
+      syncCloudRecord(record);
     });
     els.clearButton.addEventListener("click", () => resetForm());
     els.search.addEventListener("input", renderList);
