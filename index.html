@@ -618,8 +618,8 @@
         alert("请先填写姓名、微信/电话和想约日期。");
         return;
       }
+      saveCustomerAppointment(payload);
       if (!GOOGLE_SCRIPT_URL) {
-        saveCustomerAppointment(payload);
         await copyText(requestText());
         return;
       }
@@ -632,10 +632,8 @@
           mode: "no-cors",
           body: new URLSearchParams(payload)
         });
-        saveCustomerAppointment(payload);
         alert("预约信息已提交，Cc Nail 会尽快确认档期。");
       } catch {
-        saveCustomerAppointment(payload);
         await copyText(requestText());
       } finally {
         button.disabled = false;
