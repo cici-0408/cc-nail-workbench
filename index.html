@@ -396,6 +396,55 @@
       font-weight: 900;
     }
 
+    .confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(75, 45, 57, 0.34);
+      backdrop-filter: blur(8px);
+    }
+
+    .confirm-modal.is-visible { display: flex; }
+
+    .confirm-dialog {
+      width: min(390px, 100%);
+      padding: 20px 18px 18px;
+      border: 1px solid rgba(191, 93, 134, 0.26);
+      border-radius: 22px;
+      background: #fff8fb;
+      box-shadow: 0 22px 58px rgba(132, 62, 94, 0.24);
+    }
+
+    .confirm-dialog h3 {
+      margin: 0 0 12px;
+      color: var(--main);
+      font-size: 22px;
+    }
+
+    .confirm-message {
+      margin: 0 0 16px;
+      white-space: pre-wrap;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.72;
+      font-weight: 800;
+    }
+
+    .confirm-dialog button {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--main);
+      font-size: 16px;
+      font-weight: 950;
+      box-shadow: 0 12px 24px rgba(191, 93, 134, 0.24);
+    }
+
     .style-gallery {
       display: grid;
       gap: 10px;
@@ -733,6 +782,14 @@
     </section>
   </main>
 
+  <div class="confirm-modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-dialog">
+      <h3 id="confirmTitle">确认预约</h3>
+      <div class="confirm-message" id="confirmMessage"></div>
+      <button type="button" id="confirmOk">收到</button>
+    </div>
+  </div>
+
   <script>
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const CUSTOMER_APPOINTMENT_KEY = "ccNail.customerAppointment.v1";
@@ -750,6 +807,52 @@
       const now = new Date();
       const offset = now.getTimezoneOffset();
       return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
+    }
+
+    function formatDisplayDate(value) {
+      const text = String(value || "").trim();
+      if (!text) return "待确认";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        const offset = parsed.getTimezoneOffset();
+        return new Date(parsed.getTime() - offset * 60000).toISOString().slice(0, 10);
+      }
+      return text.split("T")[0] || text;
+    }
+
+    function formatDisplayTime(value) {
+      const text = String(value || "").trim();
+      if (!text) return "待确认";
+      const plain = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+      if (plain) return `${plain[1].padStart(2, "0")}:${plain[2]}`;
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        const offset = parsed.getTimezoneOffset();
+        return new Date(parsed.getTime() - offset * 60000).toISOString().slice(11, 16);
+      }
+      return text;
+    }
+
+    function confirmationMessage(item) {
+      return [
+        `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)} 到店`,
+        `项目：${item.service || "待确认"}`,
+        "",
+        "收到此消息表示已预留位置啦",
+        "确认预约定金不退，改期需提前24h沟通",
+        "请提前规划好路线哦 💗",
+        "如迟到30min默认取消位置"
+      ].join("\n");
+    }
+
+    function showConfirmModal(item) {
+      ids("confirmMessage").textContent = confirmationMessage(item);
+      ids("confirmModal").classList.add("is-visible");
+    }
+
+    function hideConfirmModal() {
+      ids("confirmModal").classList.remove("is-visible");
     }
 
     function updateQuote() {
@@ -792,7 +895,7 @@
         <h3>我的预约信息</h3>
         <p>姓名：${escapeHtml(item.name)}</p>
         <p>联系方式：${escapeHtml(item.contact)}</p>
-        <p>预约时间：${escapeHtml(item.date || "未填写")} ${escapeHtml(item.time || "待确认")}</p>
+        <p>预约时间：${escapeHtml(formatDisplayDate(item.date))} ${escapeHtml(formatDisplayTime(item.time))}</p>
         <p>项目：${escapeHtml(item.service)}</p>
         <p>卸甲：${escapeHtml(item.removalNeed || "未填写")}</p>
         <p>备注：${escapeHtml(item.styleNotes || item.notes || "无")}</p>
@@ -1029,7 +1132,7 @@
             body: new URLSearchParams(confirmedPayload)
           });
         }
-        alert("预约成功！已收到你的定金截图。");
+        showConfirmModal(confirmedPayload);
       } catch {
         await copyText(requestText());
       } finally {
@@ -1047,6 +1150,10 @@
     ids("date").addEventListener("change", () => checkDateAvailability(ids("date").value, { force: true }));
     ids("copyRequest").addEventListener("click", prepareDepositPayment);
     ids("confirmPayment").addEventListener("click", submitPaidBooking);
+    ids("confirmOk").addEventListener("click", hideConfirmModal);
+    ids("confirmModal").addEventListener("click", event => {
+      if (event.target === ids("confirmModal")) hideConfirmModal();
+    });
     ids("paymentProof").addEventListener("change", async () => {
       const file = ids("paymentProof").files?.[0];
       if (!file) return;

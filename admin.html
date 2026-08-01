@@ -81,6 +81,10 @@
       display: grid !important;
     }
 
+    body.admin-only .app {
+      width: min(1240px, calc(100% - 20px));
+    }
+
     .mobile-tabs button {
       min-height: 42px;
       border-radius: 999px;
@@ -101,6 +105,79 @@
 
     .view.hidden-view {
       display: none;
+    }
+
+    .admin-shell {
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .admin-sidebar {
+      position: sticky;
+      top: 14px;
+      display: grid;
+      gap: 10px;
+      padding: 16px 12px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255, 247, 250, 0.96);
+      box-shadow: var(--shadow);
+    }
+
+    .side-brand {
+      display: grid;
+      gap: 4px;
+      padding: 4px 6px 10px;
+      color: var(--coffee);
+    }
+
+    .side-brand strong {
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .side-brand span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .side-link {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-radius: 16px;
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 850;
+    }
+
+    .side-link::before {
+      content: attr(data-icon);
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 16px rgba(166, 82, 118, 0.1);
+    }
+
+    .side-link.active,
+    .side-link:hover {
+      color: var(--pink-600);
+      background: #fff0f6;
+    }
+
+    .admin-main {
+      min-width: 0;
     }
 
     .hero {
@@ -937,7 +1014,7 @@
 
     .record {
       display: grid;
-      grid-template-columns: 72px minmax(0, 1fr) 96px 116px 92px;
+      grid-template-columns: 72px minmax(0, 1fr) 140px 116px 92px;
       gap: 12px;
       align-items: center;
       padding: 14px;
@@ -976,6 +1053,26 @@
       border: 1px solid var(--line);
       border-radius: 14px;
       background: #fffafd;
+    }
+
+    .thumb-stack {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      align-items: start;
+    }
+
+    .thumb-card {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .thumb-card .style-thumb {
+      max-width: none;
     }
 
     .money {
@@ -1071,8 +1168,28 @@
 
       .layout,
       .notice-layout,
-      .desk-grid {
+      .desk-grid,
+      .admin-shell {
         grid-template-columns: 1fr;
+      }
+
+      .admin-sidebar {
+        position: sticky;
+        top: 8px;
+        z-index: 18;
+        grid-template-columns: repeat(6, max-content);
+        overflow-x: auto;
+        padding: 8px;
+      }
+
+      .side-brand {
+        display: none;
+      }
+
+      .side-link {
+        min-width: max-content;
+        min-height: 42px;
+        padding: 0 10px;
       }
     }
 
@@ -1255,6 +1372,10 @@
 
       .record {
         grid-template-columns: 1fr;
+      }
+
+      .thumb-stack {
+        grid-template-columns: repeat(2, minmax(0, 120px));
       }
 
       .money {
@@ -2590,10 +2711,35 @@
         .replaceAll("'", "&#039;");
     }
 
+    function formatDisplayDate(value) {
+      const text = String(value || "").trim();
+      if (!text) return "待确认";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        const offset = parsed.getTimezoneOffset();
+        return new Date(parsed.getTime() - offset * 60000).toISOString().slice(0, 10);
+      }
+      return text.split("T")[0] || text;
+    }
+
+    function formatDisplayTime(value) {
+      const text = String(value || "").trim();
+      if (!text) return APPOINTMENT_DEFAULT_TIME;
+      const plain = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+      if (plain) return `${plain[1].padStart(2, "0")}:${plain[2]}`;
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        const offset = parsed.getTimezoneOffset();
+        return new Date(parsed.getTime() - offset * 60000).toISOString().slice(11, 16);
+      }
+      return text;
+    }
+
     function appointmentMessage(record) {
       return [
         "确认预约：",
-        `${record.date} ${record.time || APPOINTMENT_DEFAULT_TIME} 到店`,
+        `${formatDisplayDate(record.date)} ${formatDisplayTime(record.time)} 到店`,
         `项目：${record.service || "待确认"}`,
         "",
         "收到此消息表示已预留位置啦",
