@@ -2282,16 +2282,20 @@
       els.cloudInboxList.innerHTML = pending.map(item => {
         const key = cloudKey(item);
         const note = item.notes ? `<p>${escapeHtml(item.notes)}</p>` : "";
+        const isDepositPaid = item.status === "deposit" || String(item.notes || "").includes("已上传定金截图");
+        const paymentProof = item.paymentProof ? `<img class="style-thumb" src="${item.paymentProof}" alt="付款截图">` : "";
         return `
           <article class="task-item">
             <div>
-              <strong>${escapeHtml(item.name || "未命名客人")} · 客户提交待确认</strong>
+              <strong>${escapeHtml(item.name || "未命名客人")} · ${isDepositPaid ? "已付定金/自动确认" : "客户提交待确认"}</strong>
               <p>${escapeHtml(item.date || "待确认")} ${escapeHtml(item.time || "待确认")} · ${escapeHtml(item.service || "待确认")} · ${escapeHtml(item.contact || "未留联系方式")}</p>
               ${note}
               ${item.quoteTotal ? `<p>估算 ${escapeHtml(item.quoteTotal)} · 定金 ${escapeHtml(item.quoteDeposit || "$10")}</p>` : ""}
+              ${item.paymentProofName ? `<p>付款截图：${escapeHtml(item.paymentProofName)}</p>` : ""}
             </div>
+            ${paymentProof}
             <div class="task-actions">
-              <button class="tiny" type="button" data-action="importCloud" data-id="${escapeHtml(key)}">加入预约</button>
+              <button class="tiny" type="button" data-action="importCloud" data-id="${escapeHtml(key)}">加入账本</button>
             </div>
           </article>
         `;
@@ -2408,6 +2412,7 @@
       const item = state.cloudInquiries.find(entry => cloudKey(entry) === id);
       if (!item) return;
       const service = item.service || "问价/还没确定";
+      const isDepositPaid = item.status === "deposit" || String(item.notes || "").includes("已上传定金截图");
       const record = {
         id: crypto.randomUUID(),
         cloudId: cloudKey(item),
@@ -2419,9 +2424,10 @@
         price: serviceBasePrice(service),
         discount: 0,
         extraFee: 0,
-        deposit: 0,
-        status: "unpaid",
-        notes: `Google客户提交：${item.notes || "待确认款式和价格"}${item.quoteTotal ? `｜估算 ${item.quoteTotal}` : ""}`,
+        deposit: isDepositPaid ? 10 : 0,
+        status: isDepositPaid ? "deposit" : "unpaid",
+        notes: `Google客户提交：${item.notes || "待确认款式和价格"}${item.quoteTotal ? `｜估算 ${item.quoteTotal}` : ""}${item.paymentProofName ? `｜付款截图 ${item.paymentProofName}` : ""}`,
+        styleImage: item.paymentProof || "",
         updatedAt: new Date().toISOString()
       };
       state.records.push(record);
@@ -2429,7 +2435,7 @@
       state.calendarMonth = record.date.slice(0, 7);
       render();
       syncCloudRecord(record);
-      alert("已加入预约，可以继续确认定金或修改价格。");
+      alert(isDepositPaid ? "已加入账本，状态为已付定金。" : "已加入账本，可以继续确认定金或修改价格。");
     }
 
     function renderList() {

@@ -306,6 +306,48 @@
       color: #7d5263;
     }
 
+    .deposit-step {
+      display: none;
+      margin-top: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--white);
+    }
+
+    .deposit-step.is-visible { display: block; }
+
+    .deposit-step h3 {
+      margin: 0 0 10px;
+      color: var(--main);
+      font-size: 17px;
+    }
+
+    .bank-box {
+      display: grid;
+      gap: 7px;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 14px;
+      background: #fff0f6;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .proof-preview {
+      display: none;
+      width: 100%;
+      max-height: 220px;
+      margin-top: 10px;
+      object-fit: contain;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .proof-preview.is-visible { display: block; }
+
     .appointment-card {
       display: none;
       margin: 0 18px 18px;
@@ -671,8 +713,21 @@
           <label for="notes">款式 / 留言 / 预算</label>
           <textarea id="notes" rows="5" placeholder="可以写想做的颜色、款式、预算，或备注：我会发参考图"></textarea>
         </div>
-        <button class="primary" id="copyRequest" type="button">提交预约信息</button>
-        <p class="hint" id="submitHint">提交后 Cc Nail 会在后台看到，会根据时间、款式和卸甲情况确认档期。</p>
+        <button class="primary" id="copyRequest" type="button">下一步：查看定金账号</button>
+        <p class="hint" id="submitHint">选到有空位的日期后，先支付 $10 定金并上传截图，上传后会自动确认预约。</p>
+        <div class="deposit-step" id="depositStep">
+          <h3>支付预约定金</h3>
+          <p class="hint">请转账 $10 定金，付款截图上传后会直接预约成功。</p>
+          <div class="bank-box">
+            <span>NAME: ZHU Q</span>
+            <span>BSB: 013132</span>
+            <span>ACCOUNT: 436090844</span>
+          </div>
+          <label for="paymentProof">上传付款截图</label>
+          <input id="paymentProof" type="file" accept="image/*">
+          <img class="proof-preview" id="paymentPreview" alt="付款截图预览">
+          <button class="primary" id="confirmPayment" type="button">我已支付并上传截图，确认预约</button>
+        </div>
       </div>
       <div class="appointment-card" id="customerAppointment"></div>
     </section>
@@ -742,8 +797,9 @@
         <p>卸甲：${escapeHtml(item.removalNeed || "未填写")}</p>
         <p>备注：${escapeHtml(item.styleNotes || item.notes || "无")}</p>
         <p>${item.finalTotal ? "最终价格" : "预估总价"}：${escapeHtml(item.finalTotal || item.quoteTotal)} · 定金：${escapeHtml(item.depositReceived || item.quoteDeposit)} · 到店尾款：${escapeHtml(item.finalBalance || item.quoteBalance)}</p>
+        ${item.paymentProof ? `<p>付款截图：已上传</p>` : ""}
         ${item.adminNote ? `<p>确认备注：${escapeHtml(item.adminNote)}</p>` : ""}
-        <span class="status">${escapeHtml(item.statusText || "已提交，等待 Cc Nail 确认档期")}</span>
+        <span class="status">${escapeHtml(item.statusText || "预约已确认，已收到定金截图")}</span>
         <button type="button" id="refreshAppointmentStatus">刷新预约状态</button>
       `;
     }
@@ -879,45 +935,106 @@
       };
     }
 
-    async function submitRequest() {
-      const payload = requestPayload();
+    function validateBookingPayload(payload) {
       if (!payload.name || !payload.contact) {
         alert("请先填写姓名和微信/电话。");
-        return;
+        return false;
       }
       if (!payload.date) {
         alert("请先选择想约日期。");
-        return;
+        return false;
       }
       if (!payload.time) {
         alert("请先选择 13:00-17:00 之间的预约时间。");
-        return;
+        return false;
       }
+      return true;
+    }
+
+    async function prepareDepositPayment() {
+      const payload = requestPayload();
+      if (!validateBookingPayload(payload)) return;
       const available = await checkDateAvailability(payload.date, { force: true });
       if (available === false) {
         alert("这一天已经没有空位啦，请换一天预约。");
         return;
       }
-      saveCustomerAppointment(payload);
-      if (!GOOGLE_SCRIPT_URL) {
-        await copyText(requestText());
+      const button = ids("copyRequest");
+      button.disabled = true;
+      button.textContent = "可以支付定金";
+      ids("depositStep").classList.add("is-visible");
+      ids("submitHint").textContent = "请支付 $10 定金并上传截图，上传后会自动确认预约。";
+      ids("depositStep").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function fileToImageDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const maxSize = 720;
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.68));
+          };
+          img.onerror = reject;
+          img.src = reader.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function submitPaidBooking() {
+      const payload = requestPayload();
+      if (!validateBookingPayload(payload)) return;
+      const proofFile = ids("paymentProof").files?.[0];
+      if (!proofFile) {
+        alert("请先上传付款截图。");
         return;
       }
-      const button = ids("copyRequest");
+      const available = await checkDateAvailability(payload.date, { force: true });
+      if (available === false) {
+        alert("这一天刚刚被预约掉了，请换一天。");
+        return;
+      }
+      const paymentProof = await fileToImageDataUrl(proofFile);
+      const confirmedPayload = {
+        ...payload,
+        paymentProof,
+        paymentProofName: proofFile.name || "付款截图",
+        status: "deposit",
+        statusText: "预约已确认，已收到定金截图",
+        depositReceived: "$10",
+        adminNote: "客户已上传定金截图，预约自动确认。",
+        notes: `${payload.notes}\n已上传定金截图，预约自动确认`
+      };
+      saveCustomerAppointment(confirmedPayload);
+      availabilityCache.set(payload.date, { available: false, checkedAt: Date.now() });
+      setSlotStatus("这天已为你预约成功。", "full");
+      const button = ids("confirmPayment");
       button.disabled = true;
       button.textContent = "提交中...";
       try {
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          body: new URLSearchParams(payload)
-        });
-        alert("预约信息已提交，Cc Nail 会尽快确认档期。");
+        if (!GOOGLE_SCRIPT_URL) {
+          await copyText(requestText());
+        } else {
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            body: new URLSearchParams(confirmedPayload)
+          });
+        }
+        alert("预约成功！已收到你的定金截图。");
       } catch {
         await copyText(requestText());
       } finally {
         button.disabled = false;
-        button.textContent = "提交预约信息";
+        button.textContent = "已提交预约";
       }
     }
 
@@ -928,7 +1045,15 @@
     ids("date").value = todayISO();
     ids("date").min = todayISO();
     ids("date").addEventListener("change", () => checkDateAvailability(ids("date").value, { force: true }));
-    ids("copyRequest").addEventListener("click", submitRequest);
+    ids("copyRequest").addEventListener("click", prepareDepositPayment);
+    ids("confirmPayment").addEventListener("click", submitPaidBooking);
+    ids("paymentProof").addEventListener("change", async () => {
+      const file = ids("paymentProof").files?.[0];
+      if (!file) return;
+      const preview = ids("paymentPreview");
+      preview.src = await fileToImageDataUrl(file);
+      preview.classList.add("is-visible");
+    });
     document.addEventListener("click", event => {
       if (event.target.closest("#refreshAppointmentStatus")) refreshCustomerAppointment();
     });
