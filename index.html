@@ -490,7 +490,7 @@
     function updateQuote() {
       const total = num(ids("quoteBase").value) + num(ids("quoteStyle").value) + num(ids("quoteDecor").value) + num(ids("quoteRemoval").value);
       const deposit = 10;
-      ids("quoteTotal").textContent = money.format(total);
+      ids("quoteTotal").textContent = `${money.format(total)}起`;
       ids("quoteDeposit").textContent = money.format(deposit);
       ids("quoteBalance").textContent = money.format(Math.max(0, total - deposit));
     }
