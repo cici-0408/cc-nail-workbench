@@ -445,71 +445,6 @@
       box-shadow: 0 12px 24px rgba(191, 93, 134, 0.24);
     }
 
-    .style-gallery {
-      display: grid;
-      gap: 10px;
-    }
-
-    .style-card {
-      display: grid;
-      grid-template-columns: 86px 1fr;
-      gap: 12px;
-      align-items: center;
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: var(--white);
-    }
-
-    .style-art {
-      min-height: 74px;
-      border-radius: 14px;
-      border: 1px solid rgba(191, 93, 134, 0.18);
-      background:
-        radial-gradient(circle at 24px 18px, #fff 0 7px, transparent 8px),
-        radial-gradient(circle at 50px 46px, rgba(255,255,255,.85) 0 5px, transparent 6px),
-        linear-gradient(135deg, #ffd4e3, #fff7fa 52%, #e990b3);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .style-art::before,
-    .style-art::after {
-      content: "";
-      position: absolute;
-      width: 18px;
-      height: 42px;
-      top: 17px;
-      border-radius: 999px 999px 12px 12px;
-      background: rgba(255, 253, 249, 0.92);
-      box-shadow: inset 0 -18px 0 rgba(191, 93, 134, 0.18);
-      transform: rotate(-8deg);
-    }
-
-    .style-art::before { left: 22px; }
-    .style-art::after { left: 47px; transform: rotate(8deg); }
-
-    .style-card h3 {
-      margin: 0 0 5px;
-      color: var(--text);
-      font-size: 16px;
-    }
-
-    .style-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.55;
-      font-weight: 760;
-    }
-
-    .style-card strong {
-      display: inline-block;
-      margin-top: 7px;
-      color: var(--main);
-      font-size: 17px;
-    }
-
     @media (max-width: 360px) {
       .grid-2, .totals { grid-template-columns: 1fr; }
     }
@@ -536,8 +471,8 @@
       </div>
       <div class="section">
         <h2>· 延长 ·</h2>
-        <div class="price-row"><span>月牙半贴（建构+塑形）</span><span>$85</span></div>
-        <div class="price-row"><span>浅贴（建构+塑形）</span><span>$100</span></div>
+        <div class="price-row"><span>月牙半贴（塑形+建构）</span><span>$85</span></div>
+        <div class="price-row"><span>浅贴（塑形+建构）</span><span>$100</span></div>
         <div class="price-row"><span>甲片二次利用</span><span>$65</span></div>
       </div>
       <div class="section">
@@ -590,9 +525,8 @@
           <label for="quoteBase">本甲/延长</label>
           <select id="quoteBase">
             <option value="55">本甲 $55</option>
-            <option value="85">月牙半贴（建构+塑形） $85</option>
-            <option value="100">浅贴（建构+塑形） $100</option>
-            <option value="65">甲片二次利用 $65</option>
+            <option value="85">月牙半贴（塑形+建构） $85</option>
+            <option value="100">浅贴（塑形+建构） $100</option>
           </select>
         </div>
         <div class="grid-2">
@@ -653,46 +587,6 @@
       </div>
     </section>
 
-    <section class="sheet" id="styleReference">
-      <div class="section">
-        <h2>· 款式参考价 ·</h2>
-        <div class="style-gallery">
-          <article class="style-card">
-            <div class="style-art"></div>
-            <div>
-              <h3>干净纯色 / 简单亮片</h3>
-              <p>适合日常通勤，颜色、细闪、猫眼可备注说明。</p>
-              <strong>$55起</strong>
-            </div>
-          </article>
-          <article class="style-card">
-            <div class="style-art"></div>
-            <div>
-              <h3>手绘 / 渐变 / 法式</h3>
-              <p>根据图案复杂度调整，带图会更好估价。</p>
-              <strong>$65起</strong>
-            </div>
-          </article>
-          <article class="style-card">
-            <div class="style-art"></div>
-            <div>
-              <h3>复杂款 / 多元素款</h3>
-              <p>包含多色、多层次、造型组合，最终按参考图确认。</p>
-              <strong>$75起</strong>
-            </div>
-          </article>
-          <article class="style-card">
-            <div class="style-art"></div>
-            <div>
-              <h3>饰品 / 钻球 / Lz</h3>
-              <p>普通饰品 $2起，东洲钻球 $5起，Lz饰品 $8起。</p>
-              <strong>按颗数/款式加价</strong>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <section class="form-card" id="booking">
       <div class="form">
         <h2>客户预约</h2>
@@ -738,15 +632,9 @@
         <div>
           <label for="service">想做项目</label>
           <select id="service">
-            <option>本甲 $55</option>
-            <option>月牙半贴（建构+塑形）</option>
-            <option>浅贴（建构+塑形）</option>
-            <option>甲片二次利用</option>
-            <option>简单款式</option>
-            <option>手绘款式</option>
-            <option>复杂款式</option>
-            <option>卸甲</option>
-            <option>还没确定，想先发款式图</option>
+            <option>本甲</option>
+            <option>月牙半贴（塑形+建构）</option>
+            <option>浅贴（塑形+建构）</option>
           </select>
         </div>
         <div>
