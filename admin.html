@@ -1702,7 +1702,7 @@
     const STORAGE_KEY = "personalNailWorkbench.v1";
     const PREF_KEY = "personalNailWorkbench.preferences.v1";
     const NOTICE_KEY = "personalNailWorkbench.notice.v1";
-    const GOOGLE_SCRIPT_URL = "";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -2672,6 +2672,12 @@
       if (action === "copyMessage" && record) copyText(appointmentMessage(record), "预约成功通知已复制，可以直接发给客人。");
       if (action === "markDeposit") markDeposit(id);
       if (action === "markPaid") markPaid(id);
+    });
+    els.refreshCloudInbox.addEventListener("click", refreshCloudInbox);
+    els.cloudInboxList.addEventListener("click", event => {
+      const button = event.target.closest("button[data-action='importCloud']");
+      if (!button) return;
+      importCloudInquiry(button.dataset.id);
     });
     els.exportButton.addEventListener("click", exportBackup);
     els.importButton.addEventListener("click", () => els.importFile.click());
