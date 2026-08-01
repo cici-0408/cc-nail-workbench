@@ -126,6 +126,19 @@
       box-shadow: var(--shadow);
     }
 
+    .side-menu-button {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: #fff;
+      background: linear-gradient(135deg, #ff9fc3, #d65f95);
+      font-size: 24px;
+      font-weight: 950;
+      box-shadow: 0 12px 24px rgba(191, 93, 134, 0.22);
+    }
+
     .side-brand {
       display: grid;
       gap: 4px;
@@ -168,6 +181,7 @@
       background: #fff;
       border: 1px solid var(--line);
       box-shadow: 0 8px 16px rgba(166, 82, 118, 0.1);
+      font-size: 15px;
     }
 
     .side-link.active,
@@ -1177,7 +1191,7 @@
         position: sticky;
         top: 8px;
         z-index: 18;
-        grid-template-columns: repeat(6, max-content);
+        grid-template-columns: repeat(7, max-content);
         overflow-x: auto;
         padding: 8px;
       }
@@ -1607,8 +1621,24 @@
     </div>
 
     <div class="view hidden-view" id="adminView">
+      <div class="admin-shell">
+        <aside class="admin-sidebar" aria-label="后台侧边栏">
+          <button class="side-menu-button" type="button" aria-label="后台菜单">≡</button>
+          <div class="side-brand">
+            <strong>Cc Nail</strong>
+            <span>Nail Studio</span>
+          </div>
+          <a class="side-link active" data-icon="🏠" href="#adminHome">工作台首页</a>
+          <a class="side-link" data-icon="📒" href="#bookingManagement">预约管理</a>
+          <a class="side-link" data-icon="📅" href="#scheduleBoard">日程</a>
+          <a class="side-link" data-icon="💰" href="#incomeBoard">收入管理</a>
+          <a class="side-link" data-icon="📊" href="#statsBoard">统计</a>
+          <a class="side-link" data-icon="⚙" href="#adminSettings">设置</a>
+        </aside>
 
-    <section class="toolbar" aria-label="工作台设置">
+        <div class="admin-main">
+
+    <section class="toolbar" aria-label="工作台设置" id="adminSettings">
       <div class="mode-toggle" aria-label="记录模式">
         <button id="dailyMode" type="button">每日重置</button>
         <button id="totalMode" type="button">累积记录</button>
@@ -1625,7 +1655,7 @@
       </div>
     </section>
 
-    <section class="stats" aria-label="营业统计">
+    <section class="stats" aria-label="营业统计" id="statsBoard">
       <div class="stat">
         <span>今日预约</span>
         <strong id="todayCount">0 单</strong>
@@ -1652,7 +1682,7 @@
       </div>
     </section>
 
-    <section class="assistant-grid" aria-label="经营小助手" id="adminAssistant">
+    <section class="assistant-grid" aria-label="经营小助手" id="adminHome">
       <div class="assistant-card">
         <span>今日空位</span>
         <strong id="slotAssistant">可预约</strong>
@@ -1692,7 +1722,7 @@
       <div class="task-list" id="cloudInboxList"></div>
     </section>
 
-    <section class="desk-grid" aria-label="工作台总览">
+    <section class="desk-grid" aria-label="工作台总览" id="scheduleBoard">
       <section class="panel" aria-label="月历预约板">
         <div class="panel-head">
           <h2>月历预约板</h2>
@@ -1709,7 +1739,7 @@
       </section>
 
       <div class="side-stack">
-        <section class="panel" aria-label="客户小账本">
+        <section class="panel" aria-label="客户小账本" id="incomeBoard">
           <div class="panel-head">
             <h2>客户小账本</h2>
             <span class="status" id="clientSummary">0 位客人</span>
@@ -1795,7 +1825,7 @@
       </section>
     </section>
 
-    <section class="layout">
+    <section class="layout" id="bookingManagement">
       <section class="panel" aria-label="新增预约">
         <div class="panel-head">
           <h2 id="formTitle">新增预约</h2>
@@ -1905,6 +1935,8 @@
         <div class="list" id="recordsList"></div>
       </section>
     </section>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -2911,6 +2943,12 @@
     els.totalMode.addEventListener("click", () => setMode("total"));
     els.customerTab.addEventListener("click", () => setView("customer"));
     els.adminTab.addEventListener("click", () => setView("admin"));
+    document.querySelectorAll(".side-link").forEach(link => {
+      link.addEventListener("click", () => {
+        document.querySelectorAll(".side-link").forEach(item => item.classList.remove("active"));
+        link.classList.add("active");
+      });
+    });
     els.selectedDate.addEventListener("change", () => {
       document.querySelector("#date").value = els.selectedDate.value;
       state.calendarMonth = els.selectedDate.value.slice(0, 7);
