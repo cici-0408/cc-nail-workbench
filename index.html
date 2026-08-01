@@ -282,6 +282,30 @@
       line-height: 1.6;
     }
 
+    .slot-status {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 850;
+    }
+
+    .slot-status.open {
+      border-color: rgba(191, 93, 134, 0.32);
+      background: #fff0f6;
+      color: var(--main);
+    }
+
+    .slot-status.full {
+      border-color: rgba(139, 79, 102, 0.28);
+      background: #f9edf2;
+      color: #7d5263;
+    }
+
     .appointment-card {
       display: none;
       margin: 0 18px 18px;
@@ -594,13 +618,32 @@
         <div class="grid-2">
           <div>
             <label for="date">想约日期</label>
-            <input id="date" type="date">
+            <input id="date" type="date" required>
           </div>
           <div>
-            <label for="time">大概时间</label>
-            <input id="time" type="time">
+            <label for="time">预约时间</label>
+            <select id="time">
+              <option value="13:00">13:00</option>
+              <option value="13:15">13:15</option>
+              <option value="13:30">13:30</option>
+              <option value="13:45">13:45</option>
+              <option value="14:00">14:00</option>
+              <option value="14:15">14:15</option>
+              <option value="14:30">14:30</option>
+              <option value="14:45">14:45</option>
+              <option value="15:00">15:00</option>
+              <option value="15:15">15:15</option>
+              <option value="15:30">15:30</option>
+              <option value="15:45">15:45</option>
+              <option value="16:00">16:00</option>
+              <option value="16:15">16:15</option>
+              <option value="16:30">16:30</option>
+              <option value="16:45">16:45</option>
+              <option value="17:00">17:00</option>
+            </select>
           </div>
         </div>
+        <div class="slot-status" id="slotStatus">请选择日期，会自动查看当天是否还有空位。</div>
         <div>
           <label for="service">想做项目</label>
           <select id="service">
@@ -638,6 +681,8 @@
   <script>
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const CUSTOMER_APPOINTMENT_KEY = "ccNail.customerAppointment.v1";
+    const APPOINTMENT_TIME_LABEL = "13:00-17:00";
+    const availabilityCache = new Map();
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const ids = id => document.getElementById(id);
 
@@ -692,7 +737,7 @@
         <h3>我的预约信息</h3>
         <p>姓名：${escapeHtml(item.name)}</p>
         <p>联系方式：${escapeHtml(item.contact)}</p>
-        <p>想约时间：${escapeHtml(item.date || "未填写")} ${escapeHtml(item.time || "待确认")}</p>
+        <p>预约时间：${escapeHtml(item.date || "未填写")} ${escapeHtml(item.time || "待确认")}</p>
         <p>项目：${escapeHtml(item.service)}</p>
         <p>卸甲：${escapeHtml(item.removalNeed || "未填写")}</p>
         <p>备注：${escapeHtml(item.styleNotes || item.notes || "无")}</p>
@@ -735,6 +780,46 @@
       return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
     }
 
+    function setSlotStatus(message, state = "") {
+      const box = ids("slotStatus");
+      box.textContent = message;
+      box.className = `slot-status ${state}`.trim();
+    }
+
+    function isActiveBooking(item) {
+      const status = String(item.status || "").toLowerCase();
+      return status !== "cancelled" && status !== "canceled";
+    }
+
+    async function checkDateAvailability(date, options = {}) {
+      if (!date) {
+        setSlotStatus("请选择日期，会自动查看当天是否还有空位。");
+        return null;
+      }
+      if (availabilityCache.has(date) && !options.force) {
+        const cached = availabilityCache.get(date);
+        setSlotStatus(cached.available ? `这天可约：请选择 ${APPOINTMENT_TIME_LABEL} 之间的时间。` : "这天没空位，请换一天。", cached.available ? "open" : "full");
+        return cached.available;
+      }
+      if (!GOOGLE_SCRIPT_URL) {
+        setSlotStatus(`这天默认可约：请选择 ${APPOINTMENT_TIME_LABEL} 之间的时间。`, "open");
+        return true;
+      }
+      setSlotStatus("正在查看这天有没有空位...");
+      try {
+        const data = await jsonp(GOOGLE_SCRIPT_URL);
+        const items = Array.isArray(data.items) ? data.items : [];
+        const taken = items.some(item => item.date === date && isActiveBooking(item));
+        const available = !taken;
+        availabilityCache.set(date, { available, checkedAt: Date.now() });
+        setSlotStatus(available ? `这天可约：请选择 ${APPOINTMENT_TIME_LABEL} 之间的时间。` : "这天没空位，请换一天。", available ? "open" : "full");
+        return available;
+      } catch {
+        setSlotStatus("暂时无法自动查看空位，可以先提交，我会再确认。");
+        return null;
+      }
+    }
+
     async function refreshCustomerAppointment(silent = false) {
       const savedText = localStorage.getItem(CUSTOMER_APPOINTMENT_KEY);
       if (!savedText || !GOOGLE_SCRIPT_URL) return;
@@ -765,7 +850,7 @@
         `姓名：${ids("name").value || "未填写"}`,
         `微信/电话：${ids("contact").value || "未填写"}`,
         `想约日期：${ids("date").value || "未填写"}`,
-        `大概时间：${ids("time").value || "待确认"}`,
+        `预约时间：${ids("time").value || "待确认"}`,
         `想做项目：${ids("service").value}`,
         `需不需要卸甲：${ids("removalNeed").value}`,
         `备注：${ids("notes").value || "无"}`,
@@ -800,6 +885,19 @@
         alert("请先填写姓名和微信/电话。");
         return;
       }
+      if (!payload.date) {
+        alert("请先选择想约日期。");
+        return;
+      }
+      if (!payload.time) {
+        alert("请先选择 13:00-17:00 之间的预约时间。");
+        return;
+      }
+      const available = await checkDateAvailability(payload.date, { force: true });
+      if (available === false) {
+        alert("这一天已经没有空位啦，请换一天预约。");
+        return;
+      }
       saveCustomerAppointment(payload);
       if (!GOOGLE_SCRIPT_URL) {
         await copyText(requestText());
@@ -828,11 +926,14 @@
       ids(id).addEventListener("change", updateQuote);
     });
     ids("date").value = todayISO();
+    ids("date").min = todayISO();
+    ids("date").addEventListener("change", () => checkDateAvailability(ids("date").value, { force: true }));
     ids("copyRequest").addEventListener("click", submitRequest);
     document.addEventListener("click", event => {
       if (event.target.closest("#refreshAppointmentStatus")) refreshCustomerAppointment();
     });
     updateQuote();
+    checkDateAvailability(ids("date").value);
     renderCustomerAppointment();
     refreshCustomerAppointment(true);
     if ("serviceWorker" in navigator && location.protocol !== "file:") {

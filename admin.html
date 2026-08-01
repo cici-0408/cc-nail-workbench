@@ -1396,7 +1396,25 @@
           </div>
           <div class="field">
             <label for="inquiryTime">大概时间</label>
-            <input id="inquiryTime" name="time" type="time">
+            <select id="inquiryTime" name="time">
+              <option value="13:00">13:00</option>
+              <option value="13:15">13:15</option>
+              <option value="13:30">13:30</option>
+              <option value="13:45">13:45</option>
+              <option value="14:00">14:00</option>
+              <option value="14:15">14:15</option>
+              <option value="14:30">14:30</option>
+              <option value="14:45">14:45</option>
+              <option value="15:00">15:00</option>
+              <option value="15:15">15:15</option>
+              <option value="15:30">15:30</option>
+              <option value="15:45">15:45</option>
+              <option value="16:00">16:00</option>
+              <option value="16:15">16:15</option>
+              <option value="16:30">16:30</option>
+              <option value="16:45">16:45</option>
+              <option value="17:00">17:00</option>
+            </select>
           </div>
         </div>
         <div class="field">
@@ -1603,7 +1621,7 @@
             </div>
             <div class="field">
               <label for="time">预约时间</label>
-              <input id="time" name="time" type="time" required>
+              <input id="time" name="time" type="time" min="13:00" max="17:00" step="900" required>
             </div>
           </div>
           <div class="grid-2">
@@ -1707,6 +1725,7 @@
     const PREF_KEY = "personalNailWorkbench.preferences.v1";
     const NOTICE_KEY = "personalNailWorkbench.notice.v1";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
+    const APPOINTMENT_DEFAULT_TIME = "13:00";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -1959,6 +1978,8 @@
         status: form.get("status"),
         notes: String(form.get("notes") || "").trim(),
         styleImage: existing?.styleImage || "",
+        cloudId: existing?.cloudId || "",
+        cloudBlockDate: existing?.cloudBlockDate || "",
         updatedAt: new Date().toISOString()
       };
     }
@@ -2007,7 +2028,7 @@
       state.editingId = null;
       els.bookingForm.reset();
       document.querySelector("#date").value = keepDate ? selected : todayISO();
-      document.querySelector("#time").value = "";
+      document.querySelector("#time").value = APPOINTMENT_DEFAULT_TIME;
       document.querySelector("#service").value = "本甲 $55";
       document.querySelector("#status").value = "paid";
       if (els.styleImage) els.styleImage.value = "";
@@ -2020,6 +2041,7 @@
     function resetInquiryForm() {
       els.customerInquiryForm.reset();
       document.querySelector("#inquiryDate").value = todayISO();
+      document.querySelector("#inquiryTime").value = APPOINTMENT_DEFAULT_TIME;
       document.querySelector("#inquiryService").value = "本甲 $55";
     }
 
@@ -2251,7 +2273,7 @@
         return;
       }
       const imported = importedCloudKeys();
-      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)));
+      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)) && !String(item.notes || "").includes("后台预约占位"));
       els.cloudInboxSummary.textContent = `${pending.length} 条待确认`;
       if (!pending.length) {
         els.cloudInboxList.innerHTML = `<div class="empty">暂无新的客户提交。点“刷新客户提交”检查 Google 表格。</div>`;
@@ -2335,6 +2357,34 @@
       } catch {}
     }
 
+    async function syncManualCloudBlock(record) {
+      if (!GOOGLE_SCRIPT_URL || record?.cloudId || record?.cloudBlockDate === record?.date) return record;
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: new URLSearchParams({
+            source: "adminBlock",
+            name: record.client || "Cc Nail 已占位",
+            contact: record.phone || "admin",
+            date: record.date || "",
+            time: record.time || APPOINTMENT_DEFAULT_TIME,
+            service: record.service || "后台预约",
+            notes: `后台预约占位：${record.client || "客人"} ${record.service || ""}`,
+            quoteTotal: money.format(finalAmount(record)),
+            quoteDeposit: money.format(toNumber(record.deposit)),
+            quoteBalance: money.format(outstandingAmount(record)),
+            status: record.status || "unpaid",
+            statusText: customerStatusText(record),
+            updatedAt: new Date().toISOString()
+          })
+        });
+        return { ...record, cloudBlockDate: record.date };
+      } catch {
+        return record;
+      }
+    }
+
     async function refreshCloudInbox() {
       if (!GOOGLE_SCRIPT_URL) {
         alert("还没有连接 Google 表格。先按我给你的步骤生成 Web App 链接。");
@@ -2362,7 +2412,7 @@
         id: crypto.randomUUID(),
         cloudId: cloudKey(item),
         date: item.date || todayISO(),
-        time: item.time || "10:00",
+        time: item.time || APPOINTMENT_DEFAULT_TIME,
         client: item.name || "未命名客人",
         phone: item.contact || "",
         service,
@@ -2438,7 +2488,7 @@
     function appointmentMessage(record) {
       return [
         "确认预约：",
-        `${record.date} ${record.time || "待确认"} 到店`,
+        `${record.date} ${record.time || APPOINTMENT_DEFAULT_TIME} 到店`,
         `项目：${record.service || "待确认"}`,
         "",
         "收到此消息表示已预留位置啦",
@@ -2589,6 +2639,8 @@
             status: record.status || "unpaid",
             notes: record.notes || "",
             styleImage: record.styleImage || "",
+            cloudId: record.cloudId || "",
+            cloudBlockDate: record.cloudBlockDate || "",
             updatedAt: record.updatedAt || new Date().toISOString()
           }));
           state.records = normalized;
@@ -2654,7 +2706,7 @@
       const form = new FormData(els.customerInquiryForm);
       const service = form.get("service");
       const date = form.get("date") || todayISO();
-      const time = form.get("time") || "10:00";
+      const time = form.get("time") || APPOINTMENT_DEFAULT_TIME;
       const note = String(form.get("notes") || "").trim();
       const record = {
         id: crypto.randomUUID(),
@@ -2693,8 +2745,9 @@
     });
     els.bookingForm.addEventListener("submit", async event => {
       event.preventDefault();
-      const record = await attachStyleImage(currentFormRecord());
+      let record = await attachStyleImage(currentFormRecord());
       if (!record.client || !record.date || !record.time) return;
+      record = await syncManualCloudBlock(record);
       const existing = state.records.findIndex(item => item.id === record.id);
       if (existing >= 0) {
         state.records[existing] = record;
