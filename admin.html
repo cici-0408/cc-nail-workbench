@@ -726,6 +726,35 @@
       white-space: pre-wrap;
     }
 
+    .booking-info-card {
+      padding: 18px;
+      border: 1px dashed rgba(191, 93, 134, 0.35);
+      border-radius: 18px;
+      background: #fffefd;
+    }
+
+    .booking-info-card h3 {
+      margin: 0 0 14px;
+      color: var(--pink-600);
+      font-size: 20px;
+    }
+
+    .booking-info-card p {
+      margin: 0 0 10px;
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.55;
+      font-weight: 850;
+    }
+
+    .booking-info-card .task-badge {
+      margin: 0 0 14px;
+    }
+
+    .booking-info-card .style-thumb {
+      margin-top: 8px;
+    }
+
     .task-actions {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -2171,6 +2200,14 @@
       localStorage.setItem(PREF_KEY, JSON.stringify({ mode: state.mode, selectedDate: els.selectedDate.value }));
     }
 
+    function normalizeRecordDateTime(record) {
+      return {
+        ...record,
+        date: formatDisplayDate(record.date || todayISO()),
+        time: formatDisplayTime(record.time || APPOINTMENT_DEFAULT_TIME)
+      };
+    }
+
     function defaultNotice() {
       return {
         shopName: "我的美甲预约须知",
@@ -2251,7 +2288,7 @@
 
     function loadAll() {
       try {
-        state.records = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        state.records = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]").map(normalizeRecordDateTime);
       } catch {
         state.records = [];
       }
@@ -2267,6 +2304,7 @@
       if (!els.selectedDate.value) els.selectedDate.value = todayISO();
       state.calendarMonth = els.selectedDate.value.slice(0, 7);
       document.querySelector("#date").value = els.selectedDate.value;
+      saveAll();
       renderQuickServices();
       setMode(state.mode);
     }
@@ -2398,7 +2436,7 @@
       let records = state.records.filter(record => record.status !== "paid");
 
       if (state.mode === "daily") {
-        records = records.filter(record => record.date === selectedDate);
+        records = records.filter(record => formatDisplayDate(record.date) === selectedDate);
       }
 
       if (status !== "all") {
@@ -2410,9 +2448,11 @@
       }
 
       records.sort((a, b) => {
-        if (els.sortBy.value === "timeDesc") return `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`);
+        const aDateTime = `${formatDisplayDate(a.date)} ${formatDisplayTime(a.time)}`;
+        const bDateTime = `${formatDisplayDate(b.date)} ${formatDisplayTime(b.time)}`;
+        if (els.sortBy.value === "timeDesc") return bDateTime.localeCompare(aDateTime);
         if (els.sortBy.value === "moneyDesc") return finalAmount(b) - finalAmount(a);
-        return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
+        return aDateTime.localeCompare(bDateTime);
       });
 
       return records;
@@ -2443,9 +2483,9 @@
       const today = todayISO();
       const selected = els.selectedDate.value;
       const monthPrefix = selected.slice(0, 7);
-      const todayRecords = state.records.filter(record => record.date === today);
-      const selectedRecords = state.records.filter(record => record.date === selected);
-      const monthRecords = state.records.filter(record => record.date && record.date.startsWith(monthPrefix));
+      const todayRecords = state.records.filter(record => formatDisplayDate(record.date) === today);
+      const selectedRecords = state.records.filter(record => formatDisplayDate(record.date) === selected);
+      const monthRecords = state.records.filter(record => formatDisplayDate(record.date).startsWith(monthPrefix));
 
       els.todayCount.textContent = `${todayRecords.length} 单`;
       els.todayRevenue.textContent = money.format(sum(todayRecords));
@@ -2461,8 +2501,8 @@
 
     function renderAdminAssistant() {
       const today = todayISO();
-      const todayRecords = state.records.filter(record => record.date === today);
-      const cloudTodayTaken = state.cloudInquiries.some(item => item.date === today && !String(item.notes || "").includes("后台预约占位"));
+      const todayRecords = state.records.filter(record => formatDisplayDate(record.date) === today);
+      const cloudTodayTaken = state.cloudInquiries.some(item => formatDisplayDate(item.date) === today && !String(item.notes || "").includes("后台预约占位"));
       const isFull = todayRecords.length > 0 || cloudTodayTaken;
       const proofCount = state.cloudInquiries.filter(cloudHasDepositProof).length;
       const depositRecords = state.records.filter(record => record.status === "deposit");
@@ -2546,9 +2586,10 @@
       for (const record of state.records) {
         const key = record.client || "未命名客人";
         const current = clients.get(key) || { count: 0, revenue: 0, latest: "", phone: record.phone || "" };
+        const dateKey = formatDisplayDate(record.date);
         current.count += 1;
         current.revenue += paidAmount(record);
-        current.latest = current.latest && current.latest > record.date ? current.latest : record.date;
+        current.latest = current.latest && current.latest > dateKey ? current.latest : dateKey;
         current.phone = current.phone || record.phone || "";
         clients.set(key, current);
       }
@@ -2598,7 +2639,7 @@
           const urgentA = a.status !== "paid" ? 0 : 1;
           const urgentB = b.status !== "paid" ? 0 : 1;
           if (urgentA !== urgentB) return urgentA - urgentB;
-          return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
+          return `${formatDisplayDate(a.date)} ${formatDisplayTime(a.time)}`.localeCompare(`${formatDisplayDate(b.date)} ${formatDisplayTime(b.time)}`);
         })
         .slice(0, 6);
     }
@@ -2607,7 +2648,7 @@
       if (String(record.notes || "").includes("客户预约/问价")) return "客户问价待确认";
       if (record.status === "unpaid") return "待收定金/确认档期";
       if (record.status === "deposit") return "已收定金，待收尾款";
-      if (record.date === todayISO()) return "今日预约";
+      if (formatDisplayDate(record.date) === todayISO()) return "今日预约";
       return "待跟进";
     }
 
@@ -2618,6 +2659,10 @@
     function taskNote(value) {
       const text = String(value || "").trim();
       return text ? `<div class="task-note">${escapeHtml(text)}</div>` : "";
+    }
+
+    function infoLine(label, value) {
+      return `<p>${label}：${escapeHtml(value || "未填写")}</p>`;
     }
 
     function renderAdminTasks() {
@@ -2698,27 +2743,26 @@
         const isDepositPaid = item.status === "deposit" || String(item.notes || "").includes("已上传定金截图");
         const paymentProof = item.paymentProof ? `<img class="style-thumb" src="${item.paymentProof}" alt="付款截图">` : "";
         const quoteLine = [
-          item.quoteTotal ? `估算 ${item.quoteTotal}` : "",
-          item.quoteDeposit ? `定金 ${item.quoteDeposit}` : "",
-          item.quoteBalance ? `尾款 ${item.quoteBalance}` : ""
+          item.quoteTotal ? `预估总价：${item.quoteTotal}` : "",
+          item.quoteDeposit ? `定金：${item.quoteDeposit}` : "",
+          item.quoteBalance ? `到店尾款：${item.quoteBalance}` : ""
         ].filter(Boolean).join(" · ");
+        const noteText = String(item.notes || "").replace(/^Google客户提交：\s*/g, "").trim();
         return `
           <article class="task-item">
-            <div>
-              <div class="task-title">
-                <strong>${escapeHtml(item.name || "未命名客人")}</strong>
-                <span class="task-badge">${isDepositPaid ? "已上传定金截图" : "客户提交待确认"}</span>
-              </div>
-              <div class="task-detail-grid">
-                ${detailCell("预约时间", `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)}`)}
-                ${detailCell("联系方式", item.contact || "未留联系方式")}
-                ${detailCell("项目", item.service || "待确认")}
-                ${detailCell("价格", quoteLine || "待确认款式和价格")}
-              </div>
-              ${taskNote(item.notes)}
-              ${item.paymentProofName ? `<div class="task-note">付款截图：${escapeHtml(item.paymentProofName)}</div>` : ""}
+            <div class="booking-info-card">
+              <h3>客人预约信息</h3>
+              <span class="task-badge">${isDepositPaid ? "已上传定金截图" : "客户提交待确认"}</span>
+              ${infoLine("姓名", item.name || "未命名客人")}
+              ${infoLine("联系方式", item.contact || "未留联系方式")}
+              ${infoLine("预约时间", `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)}`)}
+              ${infoLine("项目", item.service || "待确认")}
+              ${infoLine("卸甲/备注", noteText || "无")}
+              ${infoLine("价格", quoteLine || "待确认款式和价格")}
+              ${item.paymentProofName || item.paymentProof ? infoLine("付款截图", item.paymentProofName || "已上传") : ""}
+              ${item.adminNote ? infoLine("确认备注", item.adminNote) : ""}
+              ${paymentProof}
             </div>
-            ${paymentProof}
             <div class="task-actions">
               <button class="tiny" type="button" data-action="importCloud" data-id="${escapeHtml(key)}">加入账本</button>
               <button class="tiny" type="button" data-action="deleteCloud" data-id="${escapeHtml(key)}">删除</button>
@@ -2854,8 +2898,8 @@
       const record = {
         id: crypto.randomUUID(),
         cloudId: cloudKey(item),
-        date: item.date || todayISO(),
-        time: item.time || APPOINTMENT_DEFAULT_TIME,
+        date: formatDisplayDate(item.date || todayISO()),
+        time: formatDisplayTime(item.time || APPOINTMENT_DEFAULT_TIME),
         client: item.name || "未命名客人",
         phone: item.contact || "",
         service,
@@ -2934,6 +2978,9 @@
       if (!text) return "待确认";
       if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
       if (/^\d{4}-\d{2}-\d{2}T/.test(text)) return text.slice(0, 10);
+      const shortIso = text.match(/^(\d{2})-(\d{2})T/);
+      if (shortIso) return `${todayISO().slice(0, 4)}-${shortIso[1]}-${shortIso[2]}`;
+      if (/^\d{2}-\d{2}$/.test(text)) return `${todayISO().slice(0, 4)}-${text}`;
       const parsed = new Date(text);
       if (!Number.isNaN(parsed.getTime())) {
         const offset = parsed.getTimezoneOffset();
@@ -3106,8 +3153,8 @@
           if (!Array.isArray(records)) throw new Error("Invalid backup");
           const normalized = records.map(record => ({
             id: record.id || crypto.randomUUID(),
-            date: record.date || todayISO(),
-            time: record.time || "",
+            date: formatDisplayDate(record.date || todayISO()),
+            time: formatDisplayTime(record.time || APPOINTMENT_DEFAULT_TIME),
             client: record.client || "未命名客人",
             phone: record.phone || "",
             service: record.service || "其他",

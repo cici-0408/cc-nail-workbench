@@ -703,6 +703,9 @@
       if (!text) return "待确认";
       if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
       if (/^\d{4}-\d{2}-\d{2}T/.test(text)) return text.slice(0, 10);
+      const shortIso = text.match(/^(\d{2})-(\d{2})T/);
+      if (shortIso) return `${todayISO().slice(0, 4)}-${shortIso[1]}-${shortIso[2]}`;
+      if (/^\d{2}-\d{2}$/.test(text)) return `${todayISO().slice(0, 4)}-${text}`;
       const parsed = new Date(text);
       if (!Number.isNaN(parsed.getTime())) {
         const offset = parsed.getTimezoneOffset();
