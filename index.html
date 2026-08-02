@@ -898,16 +898,22 @@
       return status !== "cancelled" && status !== "canceled";
     }
 
-    function mergeAvailabilityItems(responses = []) {
+    function mergeAvailabilityData(responses = []) {
       const map = new Map();
+      const bookedDates = new Set();
       responses.forEach(data => {
         const items = Array.isArray(data?.items) ? data.items : [];
+        const dates = Array.isArray(data?.bookedDates) ? data.bookedDates : [];
+        dates.forEach(date => {
+          const normalized = formatDisplayDate(date);
+          if (normalized.match(/^\d{4}-\d{2}-\d{2}$/)) bookedDates.add(normalized);
+        });
         items.forEach(item => {
           const key = String(item.id || item.cloudId || `${item.name || ""}-${item.contact || ""}-${formatDisplayDate(item.date)}-${formatDisplayTime(item.time)}`);
           map.set(key, item);
         });
       });
-      return Array.from(map.values());
+      return { items: Array.from(map.values()), bookedDates: Array.from(bookedDates) };
     }
 
     async function loadAvailabilityItems(attempts = 2) {
@@ -920,7 +926,7 @@
             jsonp(`${GOOGLE_SCRIPT_URL}?all=1&check=${stamp}`)
           ]);
           const fulfilled = results.filter(result => result.status === "fulfilled").map(result => result.value);
-          if (fulfilled.length) return mergeAvailabilityItems(fulfilled);
+          if (fulfilled.length) return mergeAvailabilityData(fulfilled);
           throw results.find(result => result.status === "rejected")?.reason || new Error("availability check failed");
         } catch (error) {
           lastError = error;
@@ -946,8 +952,11 @@
       }
       setSlotStatus(`正在确认 ${selectedDateTimeLabel(date)} 有没有空位...`);
       try {
-        const items = await loadAvailabilityItems(2);
-        const taken = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
+        const availability = await loadAvailabilityItems(2);
+        const items = availability.items || [];
+        const takenByDate = (availability.bookedDates || []).includes(formatDisplayDate(date));
+        const takenByItem = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
+        const taken = takenByDate || takenByItem;
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
         setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
