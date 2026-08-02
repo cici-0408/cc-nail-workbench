@@ -643,8 +643,8 @@
           <label for="service">想做项目</label>
           <select id="service">
             <option>本甲</option>
-            <option>月牙半贴（建构+塑形）</option>
-            <option>浅贴（建构+塑形）</option>
+            <option>延长（建构+塑形）</option>
+            <option>二次利用</option>
           </select>
         </div>
         <div>
@@ -896,10 +896,25 @@
       const status = String(item.status || "").toLowerCase();
       const source = String(item.source || "").toLowerCase();
       const notes = String(item.notes || "");
+      if (!formatDisplayDate(item.date).match(/^\d{4}-\d{2}-\d{2}$/)) return false;
       if (source === "adminblock" || notes.includes("后台预约占位")) {
         return status !== "cancelled" && status !== "canceled";
       }
       return status !== "cancelled" && status !== "canceled";
+    }
+
+    async function loadAvailabilityItems(attempts = 2) {
+      let lastError = null;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          const data = await jsonp(`${GOOGLE_SCRIPT_URL}?availability=1&check=${Date.now()}_${attempt}`);
+          return Array.isArray(data.items) ? data.items : [];
+        } catch (error) {
+          lastError = error;
+          await new Promise(resolve => setTimeout(resolve, 450));
+        }
+      }
+      throw lastError || new Error("availability check failed");
     }
 
     async function checkDateAvailability(date, options = {}) {
@@ -907,26 +922,25 @@
         setSlotStatus("请选择日期，会自动查看当天是否还有空位。");
         return null;
       }
-      if (availabilityCache.has(date) && !options.force) {
-        const cached = availabilityCache.get(date);
+      const cached = availabilityCache.get(date);
+      if (cached && !options.force && Date.now() - cached.checkedAt < 30000) {
         setSlotStatus(cached.available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, cached.available ? "open" : "full");
         return cached.available;
       }
       if (!GOOGLE_SCRIPT_URL) {
-        setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。这天默认可约，可以继续提交。`, "open");
-        return true;
+        setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。暂时无法自动查空位，请联系 Cc Nail 确认。`);
+        return null;
       }
-      setSlotStatus(`正在查看 ${selectedDateTimeLabel(date)} 有没有空位...`);
+      setSlotStatus(`正在确认 ${selectedDateTimeLabel(date)} 有没有空位...`);
       try {
-        const data = await jsonp(GOOGLE_SCRIPT_URL);
-        const items = Array.isArray(data.items) ? data.items : [];
+        const items = await loadAvailabilityItems(2);
         const taken = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
         setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
         return available;
       } catch {
-        setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。Google 暂时没连上，无法自动查空位；你可以继续提交，我会再确认。`);
+        setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。暂时无法确认空位，请点日期重试或联系 Cc Nail。`);
         return null;
       }
     }

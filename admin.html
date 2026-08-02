@@ -1736,13 +1736,9 @@
         <div class="field">
           <label for="inquiryService">想做项目</label>
           <select id="inquiryService" name="service">
-            <option>本甲 $55</option>
-            <option>月牙半贴（建构+塑形）</option>
-            <option>浅贴（建构+塑形）</option>
-            <option>甲片二次利用</option>
-            <option>简单款式</option>
-            <option>手绘款式</option>
-            <option>复杂款式</option>
+            <option>本甲</option>
+            <option>延长（建构+塑形）</option>
+            <option>二次利用</option>
             <option>卸甲</option>
             <option>问价/还没确定</option>
           </select>
@@ -2087,6 +2083,9 @@
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
+      ["本甲", 55],
+      ["延长（建构+塑形）", 100],
+      ["二次利用", 65],
       ["月牙半贴（建构+塑形）", 100],
       ["浅贴（建构+塑形）", 100],
       ["甲片二次利用", 65],
@@ -2432,11 +2431,14 @@
       els.customerInquiryForm.reset();
       document.querySelector("#inquiryDate").value = todayISO();
       document.querySelector("#inquiryTime").value = APPOINTMENT_DEFAULT_TIME;
-      document.querySelector("#inquiryService").value = "本甲 $55";
+      document.querySelector("#inquiryService").value = "本甲";
     }
 
     function serviceBasePrice(service) {
       const found = servicePresets.find(([name]) => name === service);
+      if (String(service || "").includes("延长") || String(service || "").includes("月牙半贴") || String(service || "").includes("浅贴")) return 100;
+      if (String(service || "").includes("二次利用") || String(service || "").includes("甲片二次")) return 65;
+      if (String(service || "") === "本甲") return 55;
       return found ? found[1] : 0;
     }
 
