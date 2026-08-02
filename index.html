@@ -284,6 +284,13 @@
       box-shadow: 0 10px 22px rgba(191, 93, 134, 0.2);
     }
 
+    .primary:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      box-shadow: none;
+      background: #d9c2cb;
+    }
+
     .hint {
       margin: 0;
       color: var(--muted);
@@ -887,6 +894,18 @@
       box.className = `slot-status ${state}`.trim();
     }
 
+    function setBookingAvailableState(available) {
+      const button = ids("copyRequest");
+      if (available === true) {
+        button.disabled = false;
+        button.textContent = isChangingAppointment ? "提交更改预约" : "下一步：查看定金账号";
+        return;
+      }
+      button.disabled = true;
+      button.textContent = available === false ? "这天已满，请换一天" : "先选择可预约日期";
+      ids("depositStep").classList.remove("is-visible");
+    }
+
     function isActiveBooking(item) {
       const status = String(item.status || "").toLowerCase();
       const source = String(item.source || "").toLowerCase();
@@ -939,18 +958,22 @@
     async function checkDateAvailability(date, options = {}) {
       if (!date) {
         setSlotStatus("请选择日期，会自动查看当天是否还有空位。");
+        setBookingAvailableState(null);
         return null;
       }
       const cached = availabilityCache.get(date);
       if (cached && !options.force && Date.now() - cached.checkedAt < 30000) {
         setSlotStatus(cached.available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, cached.available ? "open" : "full");
+        setBookingAvailableState(cached.available);
         return cached.available;
       }
       if (!GOOGLE_SCRIPT_URL) {
         setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。暂时无法自动查空位，请联系 Cc Nail 确认。`);
+        setBookingAvailableState(true);
         return null;
       }
       setSlotStatus(`正在确认 ${selectedDateTimeLabel(date)} 有没有空位...`);
+      setBookingAvailableState(null);
       try {
         const availability = await loadAvailabilityItems(2);
         const items = availability.items || [];
@@ -960,9 +983,11 @@
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
         setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
+        setBookingAvailableState(available);
         return available;
       } catch {
         setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。暂时无法确认空位，请点日期重试或联系 Cc Nail。`);
+        setBookingAvailableState(true);
         return null;
       }
     }
@@ -1183,6 +1208,7 @@
     ids("date").min = todayISO();
     ids("date").addEventListener("change", () => checkDateAvailability(ids("date").value, { force: true }));
     ids("time").addEventListener("change", () => checkDateAvailability(ids("date").value));
+    setBookingAvailableState(null);
     ids("copyRequest").addEventListener("click", prepareDepositPayment);
     ids("confirmPayment").addEventListener("click", submitPaidBooking);
     ids("confirmOk").addEventListener("click", hideConfirmModal);
