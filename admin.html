@@ -2284,7 +2284,9 @@
       els.adminView.classList.toggle("hidden-view", customer);
       els.customerTab.classList.toggle("active", customer);
       els.adminTab.classList.toggle("active", !customer);
-      location.hash = customer ? "customer" : "admin";
+      if (customer) {
+        location.hash = "customer";
+      }
     }
 
     function currentFormRecord() {
@@ -3257,11 +3259,11 @@
 
     loadAll();
     loadNotice();
-    showAdminPage(location.hash ? location.hash.slice(1) : "adminHome");
+    setView("admin");
+    showAdminPage(location.hash && location.hash !== "#admin" ? location.hash.slice(1) : "adminHome");
     resetForm();
     resetInquiryForm();
     updateQuote();
-    setView(location.hash === "#admin" ? "admin" : "customer");
     render();
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js");
