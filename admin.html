@@ -622,6 +622,18 @@
       align-items: start;
     }
 
+    #bookingManagement {
+      grid-template-columns: 1fr;
+    }
+
+    #bookingManagement > .panel[aria-label="预约列表"] {
+      order: 1;
+    }
+
+    #bookingManagement > .panel[aria-label="新增预约"] {
+      order: 2;
+    }
+
     .notice-layout {
       display: grid;
       grid-template-columns: 380px minmax(0, 1fr);
@@ -2442,13 +2454,8 @@
 
     function visibleRecords() {
       const query = els.search.value.trim().toLowerCase();
-      const selectedDate = els.selectedDate.value;
       const status = els.statusFilter.value;
       let records = state.records.filter(record => record.status !== "paid");
-
-      if (state.mode === "daily") {
-        records = records.filter(record => formatDisplayDate(record.date) === selectedDate);
-      }
 
       if (status !== "all") {
         records = records.filter(record => record.status === status);
@@ -2645,7 +2652,7 @@
       const today = todayISO();
       return [...state.records]
         .filter(record => record.status !== "paid")
-        .filter(record => formatDisplayDate(record.date) === today || String(record.notes || "").includes("客户预约/问价") || record.status === "unpaid" || record.status === "deposit")
+        .filter(record => formatDisplayDate(record.date) === today)
         .sort((a, b) => {
           const urgentA = a.status !== "paid" ? 0 : 1;
           const urgentB = b.status !== "paid" ? 0 : 1;
@@ -3142,6 +3149,7 @@
     function editRecord(id) {
       const record = state.records.find(item => item.id === id);
       if (!record) return;
+      showAdminPage("bookingManagement");
       state.editingId = id;
       for (const [key, value] of Object.entries(record)) {
         const input = els.bookingForm.elements[key];
@@ -3151,7 +3159,9 @@
       els.submitButton.textContent = "保存修改";
       updateCalculatedTotal();
       setStyleImagePreview(record.styleImage || "");
-      window.scrollTo({ top: document.querySelector(".layout").offsetTop - 12, behavior: "smooth" });
+      requestAnimationFrame(() => {
+        document.querySelector("#bookingManagement")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     }
 
     async function deleteRecord(id) {
