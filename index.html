@@ -701,6 +701,7 @@
       const text = String(value || "").trim();
       if (!text) return "待确认";
       if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+      if (/^\d{4}-\d{2}-\d{2}T/.test(text)) return text.slice(0, 10);
       const parsed = new Date(text);
       if (!Number.isNaN(parsed.getTime())) {
         const offset = parsed.getTimezoneOffset();
@@ -714,12 +715,21 @@
       if (!text) return "待确认";
       const plain = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
       if (plain) return `${plain[1].padStart(2, "0")}:${plain[2]}`;
+      const timeOnlyIso = text.match(/^1899-12-30T(\d{2}):(\d{2})/);
+      if (timeOnlyIso) {
+        const hour = (Number(timeOnlyIso[1]) + 11) % 24;
+        return `${String(hour).padStart(2, "0")}:${timeOnlyIso[2]}`;
+      }
       const parsed = new Date(text);
       if (!Number.isNaN(parsed.getTime())) {
         const offset = parsed.getTimezoneOffset();
         return new Date(parsed.getTime() - offset * 60000).toISOString().slice(11, 16);
       }
       return text;
+    }
+
+    function selectedDateTimeLabel(date = ids("date")?.value, time = ids("time")?.value) {
+      return `${formatDisplayDate(date)} ${formatDisplayTime(time)}`;
     }
 
     function confirmationMessage(item) {
@@ -845,24 +855,24 @@
       }
       if (availabilityCache.has(date) && !options.force) {
         const cached = availabilityCache.get(date);
-        setSlotStatus(cached.available ? `这天可约：请选择 ${APPOINTMENT_TIME_LABEL} 之间的时间。` : "这天没空位，请换一天。", cached.available ? "open" : "full");
+        setSlotStatus(cached.available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, cached.available ? "open" : "full");
         return cached.available;
       }
       if (!GOOGLE_SCRIPT_URL) {
-        setSlotStatus(`这天默认可约：请选择 ${APPOINTMENT_TIME_LABEL} 之间的时间。`, "open");
+        setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。这天默认可约，可以继续提交。`, "open");
         return true;
       }
-      setSlotStatus("正在查看这天有没有空位...");
+      setSlotStatus(`正在查看 ${selectedDateTimeLabel(date)} 有没有空位...`);
       try {
         const data = await jsonp(GOOGLE_SCRIPT_URL);
         const items = Array.isArray(data.items) ? data.items : [];
         const taken = items.some(item => item.date === date && isActiveBooking(item));
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
-        setSlotStatus(available ? `这天可约：请选择 ${APPOINTMENT_TIME_LABEL} 之间的时间。` : "这天没空位，请换一天。", available ? "open" : "full");
+        setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
         return available;
       } catch {
-        setSlotStatus("暂时无法自动查看空位，可以先提交，我会再确认。");
+        setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。Google 暂时没连上，无法自动查空位；你可以继续提交，我会再确认。`);
         return null;
       }
     }
@@ -1036,6 +1046,7 @@
     ids("date").value = todayISO();
     ids("date").min = todayISO();
     ids("date").addEventListener("change", () => checkDateAvailability(ids("date").value, { force: true }));
+    ids("time").addEventListener("change", () => checkDateAvailability(ids("date").value));
     ids("copyRequest").addEventListener("click", prepareDepositPayment);
     ids("confirmPayment").addEventListener("click", submitPaidBooking);
     ids("confirmOk").addEventListener("click", hideConfirmModal);
