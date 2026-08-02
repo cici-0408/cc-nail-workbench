@@ -2074,7 +2074,7 @@
     const DISMISSED_CLOUD_KEY = "personalNailWorkbench.dismissedCloud.v1";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const APPOINTMENT_DEFAULT_TIME = "13:00";
-    const CLOUD_BLOCK_SYNC_VERSION = "v21";
+    const CLOUD_BLOCK_SYNC_VERSION = "v22";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -2880,26 +2880,31 @@
         return { ...record, cloudId: blockId };
       }
       try {
+        const blockPayload = {
+          id: blockId,
+          source: "adminBlock",
+          name: record.client || "Cc Nail 已占位",
+          contact: record.phone || "admin",
+          date: record.date || "",
+          time: record.time || APPOINTMENT_DEFAULT_TIME,
+          service: record.service || "后台预约",
+          notes: `后台预约占位：${record.client || "客人"} ${record.service || ""}`,
+          quoteTotal: money.format(finalAmount(record)),
+          quoteDeposit: money.format(toNumber(record.deposit)),
+          quoteBalance: money.format(outstandingAmount(record)),
+          status: record.status || "unpaid",
+          statusText: customerStatusText(record),
+          updatedAt: new Date().toISOString()
+        };
         await fetch(GOOGLE_SCRIPT_URL, {
           method: "POST",
           mode: "no-cors",
-          body: new URLSearchParams({
-            action: "updateStatus",
-            id: blockId,
-            source: "adminBlock",
-            name: record.client || "Cc Nail 已占位",
-            contact: record.phone || "admin",
-            date: record.date || "",
-            time: record.time || APPOINTMENT_DEFAULT_TIME,
-            service: record.service || "后台预约",
-            notes: `后台预约占位：${record.client || "客人"} ${record.service || ""}`,
-            quoteTotal: money.format(finalAmount(record)),
-            quoteDeposit: money.format(toNumber(record.deposit)),
-            quoteBalance: money.format(outstandingAmount(record)),
-            status: record.status || "unpaid",
-            statusText: customerStatusText(record),
-            updatedAt: new Date().toISOString()
-          })
+          body: new URLSearchParams(blockPayload)
+        });
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: new URLSearchParams({ ...blockPayload, action: "updateStatus" })
         });
         return { ...record, cloudId: blockId, cloudBlockDate: record.date, cloudBlockTime: record.time, cloudBlockSyncVersion: CLOUD_BLOCK_SYNC_VERSION };
       } catch {
