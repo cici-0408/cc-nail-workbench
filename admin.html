@@ -2858,7 +2858,7 @@
         const styleImage = record.styleImage ? `<img class="style-thumb" src="${record.styleImage}" alt="款式图片">` : "";
         return `
           <article class="record">
-            <div class="time">${escapeHtml(record.date.slice(5))}<br>${escapeHtml(record.time || "--:--")}</div>
+            <div class="time">${escapeHtml(formatDisplayDate(record.date).slice(5))}<br>${escapeHtml(formatDisplayTime(record.time))}</div>
             <div>
               <h3>${escapeHtml(record.client)}${phoneText}</h3>
               <p>${escapeHtml(record.service)} · 原价 ${money.format(record.price)} · ${discountText}${extraFeeText}</p>

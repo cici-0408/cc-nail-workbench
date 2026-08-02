@@ -732,6 +732,14 @@
       return `${formatDisplayDate(date)} ${formatDisplayTime(time)}`;
     }
 
+    function normalizeAppointmentPayload(payload = {}) {
+      return {
+        ...payload,
+        date: formatDisplayDate(payload.date),
+        time: formatDisplayTime(payload.time)
+      };
+    }
+
     function confirmationMessage(item) {
       return [
         `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)} 到店`,
@@ -787,7 +795,7 @@
         box.innerHTML = "";
         return;
       }
-      const item = JSON.parse(saved);
+      const item = normalizeAppointmentPayload(JSON.parse(saved));
       box.classList.add("is-visible");
       box.innerHTML = `
         <h3>我的预约信息</h3>
@@ -806,8 +814,9 @@
     }
 
     function saveCustomerAppointment(payload) {
+      const cleanPayload = normalizeAppointmentPayload(payload);
       localStorage.setItem(CUSTOMER_APPOINTMENT_KEY, JSON.stringify({
-        ...payload,
+        ...cleanPayload,
         submittedAt: new Date().toISOString()
       }));
       renderCustomerAppointment();
@@ -866,7 +875,7 @@
       try {
         const data = await jsonp(GOOGLE_SCRIPT_URL);
         const items = Array.isArray(data.items) ? data.items : [];
-        const taken = items.some(item => item.date === date && isActiveBooking(item));
+        const taken = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
         setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
@@ -887,13 +896,13 @@
         const items = Array.isArray(data.items) ? data.items : [];
         const matches = items
           .filter(item => sameContact(item.contact, saved.contact))
-          .filter(item => !saved.date || !item.date || item.date === saved.date)
+          .filter(item => !saved.date || !item.date || formatDisplayDate(item.date) === formatDisplayDate(saved.date))
           .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
         if (!matches.length) {
           if (!silent) alert("暂时还没有查到 Cc Nail 的确认更新。");
           return;
         }
-        localStorage.setItem(CUSTOMER_APPOINTMENT_KEY, JSON.stringify({ ...saved, ...matches[0] }));
+        localStorage.setItem(CUSTOMER_APPOINTMENT_KEY, JSON.stringify(normalizeAppointmentPayload({ ...saved, ...matches[0] })));
         renderCustomerAppointment();
         if (!silent) alert("预约状态已刷新。");
       } catch {
@@ -906,8 +915,8 @@
         "Cc Nail 预约",
         `姓名：${ids("name").value || "未填写"}`,
         `微信/电话：${ids("contact").value || "未填写"}`,
-        `想约日期：${ids("date").value || "未填写"}`,
-        `预约时间：${ids("time").value || "待确认"}`,
+        `想约日期：${formatDisplayDate(ids("date").value) || "未填写"}`,
+        `预约时间：${formatDisplayTime(ids("time").value) || "待确认"}`,
         `想做项目：${ids("service").value}`,
         `需不需要卸甲：${ids("removalNeed").value}`,
         `备注：${ids("notes").value || "无"}`,
