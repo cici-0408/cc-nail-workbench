@@ -979,6 +979,12 @@
       line-height: 1.4;
     }
 
+    .mini-actions {
+      display: grid;
+      gap: 8px;
+      min-width: 96px;
+    }
+
     .quick-services {
       display: flex;
       flex-wrap: wrap;
@@ -2826,7 +2832,10 @@
             <strong>${escapeHtml(formatDisplayTime(record.time))} · ${escapeHtml(record.client || "未命名客人")}</strong>
             <small>${escapeHtml(record.service || "待确认项目")} · ${escapeHtml(statusLabel(record.status))} · 总价 ${money.format(finalAmount(record))} · 待收 ${money.format(outstandingAmount(record))}</small>
           </span>
-          <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">改期/编辑</button>
+          <span class="mini-actions">
+            <button class="tiny" type="button" data-action="reschedule" data-id="${escapeHtml(record.id)}">改期</button>
+            <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">编辑全部</button>
+          </span>
         </div>
       `).join("");
     }
@@ -3596,6 +3605,35 @@
       });
     }
 
+    async function rescheduleRecord(id) {
+      const record = state.records.find(item => item.id === id);
+      if (!record) return;
+      const currentDate = formatDisplayDate(record.date);
+      const currentTime = formatDisplayTime(record.time);
+      const newDate = window.prompt(`给 ${record.client || "客人"} 改到哪一天？格式：YYYY-MM-DD`, currentDate);
+      if (!newDate) return;
+      const normalizedDate = formatDisplayDate(newDate);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+        alert("日期格式不对，请用 2026-08-04 这种格式。");
+        return;
+      }
+      const newTime = window.prompt("新的到店时间？可以填 13:00、13:15、14:30 这种", currentTime);
+      if (!newTime) return;
+      const normalizedTime = formatDisplayTime(newTime);
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(normalizedTime)) {
+        alert("时间格式不对，请用 13:00 或 14:30 这种格式。");
+        return;
+      }
+      let updatedRecord = { ...record, date: normalizedDate, time: normalizedTime, updatedAt: new Date().toISOString() };
+      updatedRecord = await syncManualCloudBlock(updatedRecord);
+      state.records = state.records.map(item => item.id === id ? updatedRecord : item);
+      els.selectedDate.value = normalizedDate;
+      state.calendarMonth = normalizedDate.slice(0, 7);
+      render();
+      syncCloudRecord(updatedRecord);
+      alert(`${record.client || "客人"} 已改到 ${normalizedDate} ${normalizedTime}。`);
+    }
+
     async function deleteRecord(id) {
       const record = state.records.find(item => item.id === id);
       if (!record) return;
@@ -3740,9 +3778,10 @@
       render();
     });
     els.scheduleDayOrders.addEventListener("click", event => {
-      const button = event.target.closest("button[data-action='editSchedule']");
+      const button = event.target.closest("button[data-action]");
       if (!button) return;
-      editRecord(button.dataset.id);
+      if (button.dataset.action === "reschedule") rescheduleRecord(button.dataset.id);
+      if (button.dataset.action === "editSchedule") editRecord(button.dataset.id);
     });
     els.quickServices.addEventListener("click", event => {
       const button = event.target.closest("button[data-service]");
