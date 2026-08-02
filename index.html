@@ -389,12 +389,18 @@
       box-shadow: 0 8px 16px rgba(191, 93, 134, 0.2);
     }
 
-    .calendar-day.full,
-    .calendar-day.past {
+    .calendar-day.full {
       cursor: not-allowed;
       background: #2d2227;
       color: rgba(255, 255, 255, 0.68);
       border-color: #2d2227;
+    }
+
+    .calendar-day.past {
+      cursor: not-allowed;
+      background: #f1e8ed;
+      color: rgba(78, 45, 59, 0.36);
+      border-color: rgba(191, 93, 134, 0.14);
     }
 
     .calendar-day.blank {
@@ -429,6 +435,11 @@
     .legend-dot.full::before {
       background: #2d2227;
       border-color: #2d2227;
+    }
+
+    .legend-dot.past::before {
+      background: #f1e8ed;
+      border-color: rgba(191, 93, 134, 0.14);
     }
 
     .deposit-step {
@@ -759,6 +770,7 @@
           <div class="calendar-legend">
             <span class="legend-dot">粉色可约</span>
             <span class="legend-dot full">黑色已满</span>
+            <span class="legend-dot past">灰色过期</span>
           </div>
         </div>
         <div class="slot-status" id="slotStatus">请选择日期，会自动查看当天是否还有空位。</div>
@@ -933,10 +945,6 @@
 
     function updateBookedDatesFromAvailability(data = {}) {
       const booked = new Set();
-      (data.bookedDates || []).forEach(date => {
-        const normalized = formatDisplayDate(date);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) booked.add(normalized);
-      });
       (data.items || []).forEach(item => {
         const normalized = formatDisplayDate(item.date);
         if (/^\d{4}-\d{2}-\d{2}$/.test(normalized) && isActiveBooking(item)) booked.add(normalized);
@@ -1192,9 +1200,8 @@
         const availability = await loadAvailabilityItems(2);
         updateBookedDatesFromAvailability(availability);
         const items = availability.items || [];
-        const takenByDate = (availability.bookedDates || []).includes(formatDisplayDate(date));
         const takenByItem = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
-        const taken = takenByDate || takenByItem;
+        const taken = takenByItem;
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
         setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
