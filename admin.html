@@ -1920,9 +1920,9 @@
         <small id="balanceAssistantHint">已收定金但还没结清的金额。</small>
       </div>
       <div class="assistant-card">
-        <span>数据备份</span>
+        <span>云端同步</span>
         <strong id="backupAssistant">本地+Google</strong>
-        <small id="backupAssistantHint">换设备前建议导出备份，客户提交走 Google。</small>
+        <small id="backupAssistantHint">打开后台会自动同步 Google 订单。</small>
       </div>
     </section>
 
@@ -1947,7 +1947,7 @@
         <h2>客户提交收件箱</h2>
         <span class="status" id="cloudInboxSummary">未连接 Google</span>
       </div>
-      <button class="pill-button primary" id="refreshCloudInbox" type="button">刷新客户提交</button>
+      <button class="pill-button primary" id="refreshCloudInbox" type="button">同步云端订单</button>
       <div class="task-list" id="cloudInboxList"></div>
     </section>
 
@@ -2176,7 +2176,7 @@
     const DISMISSED_CLOUD_KEY = "personalNailWorkbench.dismissedCloud.v1";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const APPOINTMENT_DEFAULT_TIME = "13:00";
-    const CLOUD_BLOCK_SYNC_VERSION = "v22";
+    const CLOUD_BLOCK_SYNC_VERSION = "v25";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -2301,6 +2301,11 @@
     function toNumber(value) {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    }
+
+    function moneyValue(value) {
+      const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+      return match ? toNumber(match[0]) : 0;
     }
 
     function finalAmount(record) {
@@ -2673,7 +2678,7 @@
       const proofCount = state.cloudInquiries.filter(cloudHasDepositProof).length;
       const depositRecords = state.records.filter(record => record.status === "deposit");
       const depositBalance = sum(depositRecords, outstandingAmount);
-      const lastBackup = localStorage.getItem("ccNail.lastBackupAt");
+      const lastSync = localStorage.getItem("ccNail.lastCloudSyncAt");
 
       els.slotAssistant.textContent = isFull ? "今日已满" : "今日可约";
       els.slotAssistantHint.textContent = isFull ? "客户页会提示今天没空位。" : "客户页还能预约今天 13:00-17:00。";
@@ -2682,7 +2687,7 @@
       els.balanceAssistant.textContent = money.format(depositBalance);
       els.balanceAssistantHint.textContent = depositRecords.length ? `${depositRecords.length} 位客人已付定金，待收尾款。` : "当前没有待收尾款。";
       els.backupAssistant.textContent = state.records.length ? `${state.records.length} 条记录` : "未开始";
-      els.backupAssistantHint.textContent = lastBackup ? `上次导出：${lastBackup}` : "建议每周点一次“导出备份”。";
+      els.backupAssistantHint.textContent = lastSync ? `已同步：${lastSync}` : "打开后台会自动拉取 Google 订单。";
     }
 
     function smartList(items) {
@@ -2965,6 +2970,122 @@
       return new Set(state.records.map(record => String(record.cloudId || "")));
     }
 
+    function cloudItemDeleted(item) {
+      const status = String(item.status || "").toLowerCase();
+      const notes = String(item.notes || "");
+      return status === "cancelled" || status === "canceled" || notes.includes("已取消");
+    }
+
+    function cloudItemStatus(item) {
+      const status = String(item.status || "").toLowerCase();
+      if (status === "paid") return "paid";
+      if (status === "deposit") return "deposit";
+      if (item.paymentProof || item.paymentProofName || moneyValue(item.depositReceived) > 0) return "deposit";
+      return "unpaid";
+    }
+
+    function cloudItemRecordId(item) {
+      const key = cloudKey(item);
+      return `cloud-${key.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80)}`;
+    }
+
+    function cloudItemToRecord(item, existing = null) {
+      const key = cloudKey(item);
+      const service = item.service || existing?.service || "待确认项目";
+      const source = String(item.source || "");
+      const notes = [
+        item.removalNeed ? `卸甲：${item.removalNeed}` : "",
+        item.notes || "",
+        item.quoteTotal ? `估算 ${item.quoteTotal}` : "",
+        item.paymentProofName ? `付款截图 ${item.paymentProofName}` : "",
+        item.adminNote || ""
+      ].filter(Boolean).join(" ");
+      const finalTotal = moneyValue(item.finalTotal);
+      const quoteTotal = moneyValue(item.quoteTotal);
+      const deposit = moneyValue(item.depositReceived) || moneyValue(item.quoteDeposit) || toNumber(existing?.deposit);
+      const price = finalTotal || quoteTotal || toNumber(existing?.price) || serviceBasePrice(service);
+
+      return {
+        id: existing?.id || cloudItemRecordId(item),
+        cloudId: key,
+        date: formatDisplayDate(item.date || existing?.date || todayISO()),
+        time: formatDisplayTime(item.time || existing?.time || APPOINTMENT_DEFAULT_TIME),
+        client: item.name || existing?.client || "未命名客人",
+        phone: item.contact || existing?.phone || "",
+        service,
+        price,
+        discount: toNumber(existing?.discount),
+        extraFee: finalTotal && existing ? toNumber(existing.extraFee) : toNumber(existing?.extraFee),
+        deposit,
+        status: cloudItemStatus(item),
+        notes: notes || existing?.notes || "",
+        styleImage: item.paymentProof || existing?.styleImage || "",
+        cloudBlockDate: source === "adminBlock" ? formatDisplayDate(item.date || existing?.cloudBlockDate || "") : existing?.cloudBlockDate || "",
+        cloudBlockTime: source === "adminBlock" ? formatDisplayTime(item.time || existing?.cloudBlockTime || "") : existing?.cloudBlockTime || "",
+        cloudBlockSyncVersion: source === "adminBlock" ? CLOUD_BLOCK_SYNC_VERSION : existing?.cloudBlockSyncVersion || "",
+        updatedAt: item.updatedAt || existing?.updatedAt || new Date().toISOString()
+      };
+    }
+
+    function isNewerThanCloud(localRecord, cloudItem) {
+      const localTime = Date.parse(localRecord?.updatedAt || "");
+      const cloudTime = Date.parse(cloudItem?.updatedAt || "");
+      return Number.isFinite(localTime) && Number.isFinite(cloudTime) && localTime > cloudTime + 5000;
+    }
+
+    function mergeCloudRecords(items = []) {
+      const byCloudId = new Map();
+      const next = [];
+      state.records.forEach(record => {
+        const key = String(record.cloudId || "");
+        if (key) byCloudId.set(key, record);
+        next.push(record);
+      });
+
+      let changed = false;
+      items.forEach(item => {
+        const key = cloudKey(item);
+        if (!key || dismissedCloudKeys.has(key) || dismissedCloudKeys.has(cloudStableKey(item))) return;
+        const existing = byCloudId.get(key) || state.records.find(record => cloudStableKey({
+          name: record.client,
+          contact: record.phone,
+          date: record.date,
+          time: record.time,
+          service: record.service
+        }) === cloudStableKey(item));
+
+        if (cloudItemDeleted(item)) {
+          if (existing) {
+            const index = next.findIndex(record => record.id === existing.id);
+            if (index >= 0) {
+              next.splice(index, 1);
+              changed = true;
+            }
+          }
+          return;
+        }
+
+        const merged = isNewerThanCloud(existing, item) ? { ...existing, cloudId: key } : cloudItemToRecord(item, existing);
+        const index = next.findIndex(record => record.id === merged.id || (record.cloudId && record.cloudId === key));
+        if (index >= 0) {
+          if (JSON.stringify(next[index]) !== JSON.stringify(merged)) {
+            next[index] = merged;
+            changed = true;
+          }
+        } else {
+          next.push(merged);
+          changed = true;
+        }
+        byCloudId.set(key, merged);
+      });
+
+      if (changed) {
+        state.records = next.map(normalizeRecordDateTime);
+        saveAll();
+      }
+      return changed;
+    }
+
     function saveDismissedCloudKeys() {
       localStorage.setItem(DISMISSED_CLOUD_KEY, JSON.stringify([...dismissedCloudKeys]));
     }
@@ -3089,6 +3210,31 @@
       } catch {}
     }
 
+    async function cancelCloudRecord(record) {
+      if (!GOOGLE_SCRIPT_URL || !record?.cloudId) return;
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: new URLSearchParams({
+            action: "updateStatus",
+            id: record.cloudId,
+            source: isAdminCloudBlock(record) ? "adminBlock" : "adminUpdate",
+            name: record.client || "未命名客人",
+            contact: record.phone || "",
+            date: record.date || "",
+            time: record.time || APPOINTMENT_DEFAULT_TIME,
+            service: record.service || "",
+            notes: `${record.notes || ""} 已取消`,
+            status: "cancelled",
+            statusText: "后台已删除/取消",
+            adminNote: "后台已删除这条预约。",
+            updatedAt: new Date().toISOString()
+          })
+        });
+      } catch {}
+    }
+
     function isAdminCloudBlock(record) {
       return String(record?.cloudId || "").startsWith("admin-") || String(record?.notes || "").includes("后台预约占位");
     }
@@ -3195,22 +3341,58 @@
         return;
       }
       els.refreshCloudInbox.disabled = true;
-      els.refreshCloudInbox.textContent = "刷新中...";
+      els.refreshCloudInbox.textContent = "同步中...";
       try {
         const data = await jsonp(GOOGLE_SCRIPT_URL);
         state.cloudInquiries = Array.isArray(data.items) ? data.items : [];
+        const changed = mergeCloudRecords(state.cloudInquiries);
+        localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
+        if (changed) render();
         renderCloudInbox();
       } catch {
-        alert("刷新失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
+        alert("同步失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
       } finally {
         els.refreshCloudInbox.disabled = false;
-        els.refreshCloudInbox.textContent = "刷新客户提交";
+        els.refreshCloudInbox.textContent = "同步云端订单";
+        renderAdminAssistant();
+      }
+    }
+
+    async function syncAllCloudRecords(silent = false) {
+      if (!GOOGLE_SCRIPT_URL) return;
+      if (els.refreshCloudInbox) {
+        els.refreshCloudInbox.disabled = true;
+        els.refreshCloudInbox.textContent = "同步中...";
+      }
+      try {
+        const data = await jsonp(GOOGLE_SCRIPT_URL);
+        state.cloudInquiries = Array.isArray(data.items) ? data.items : [];
+        const changed = mergeCloudRecords(state.cloudInquiries);
+        localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
+        if (changed) render();
+        renderCloudInbox();
+      } catch {
+        if (!silent) alert("同步失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
+      } finally {
+        if (els.refreshCloudInbox) {
+          els.refreshCloudInbox.disabled = false;
+          els.refreshCloudInbox.textContent = "同步云端订单";
+        }
+        renderAdminAssistant();
       }
     }
 
     function importCloudInquiry(id) {
       const item = state.cloudInquiries.find(entry => cloudKey(entry) === id);
       if (!item) return;
+      const existing = state.records.find(record => record.cloudId === cloudKey(item));
+      if (existing) {
+        els.selectedDate.value = existing.date;
+        state.calendarMonth = existing.date.slice(0, 7);
+        editRecord(existing.id);
+        alert("这条已经在预约账本里了，我帮你打开编辑。");
+        return;
+      }
       const service = item.service || "问价/还没确定";
       const isDepositPaid = item.status === "deposit" || String(item.notes || "").includes("已上传定金截图");
       const record = {
@@ -3419,7 +3601,10 @@
       if (!record) return;
       const ok = confirm(`删除 ${record.client} 的预约记录吗？`);
       if (!ok) return;
+      await cancelCloudRecord(record);
       await cancelManualCloudBlock(record);
+      if (record.cloudId) dismissedCloudKeys.add(record.cloudId);
+      saveDismissedCloudKeys();
       state.records = state.records.filter(item => item.id !== id);
       if (state.editingId === id) resetForm();
       render();
@@ -3690,7 +3875,7 @@
     resetInquiryForm();
     updateQuote();
     render();
-    syncPendingManualBlocks();
+    syncPendingManualBlocks().then(() => syncAllCloudRecords(true));
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js");
     }
