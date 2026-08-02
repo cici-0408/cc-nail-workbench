@@ -475,14 +475,9 @@
 
     <section class="sheet" id="prices">
       <div class="section">
-        <h2>· 本甲 ·</h2>
-        <div class="price-row"><span>本甲</span><span>$55</span></div>
-      </div>
-      <div class="section">
         <h2>· 延长 ·</h2>
-        <div class="price-row"><span>月牙半贴（建构+塑形）</span><span>$100</span></div>
-        <div class="price-row"><span>浅贴（建构+塑形）</span><span>$100</span></div>
-        <div class="price-row"><span>甲片二次利用</span><span>$65</span></div>
+        <div class="price-row"><span>月牙半贴/浅贴（建构+塑形）</span><span>$100</span></div>
+        <div class="price-row"><span>甲片二次利用</span><span>$85</span></div>
         <p class="price-note">延长甲片会挑选更适合你的甲型。</p>
       </div>
       <div class="section">
@@ -535,8 +530,8 @@
           <label for="quoteBase">本甲/延长</label>
           <select id="quoteBase">
             <option value="55">本甲 $55</option>
-            <option value="100">月牙半贴（建构+塑形） $100</option>
-            <option value="100">浅贴（建构+塑形） $100</option>
+            <option value="100">延长（建构+塑形） $100</option>
+            <option value="85">二次利用 $85</option>
           </select>
         </div>
         <div class="grid-2">
@@ -903,12 +898,30 @@
       return status !== "cancelled" && status !== "canceled";
     }
 
+    function mergeAvailabilityItems(responses = []) {
+      const map = new Map();
+      responses.forEach(data => {
+        const items = Array.isArray(data?.items) ? data.items : [];
+        items.forEach(item => {
+          const key = String(item.id || item.cloudId || `${item.name || ""}-${item.contact || ""}-${formatDisplayDate(item.date)}-${formatDisplayTime(item.time)}`);
+          map.set(key, item);
+        });
+      });
+      return Array.from(map.values());
+    }
+
     async function loadAvailabilityItems(attempts = 2) {
       let lastError = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
-          const data = await jsonp(`${GOOGLE_SCRIPT_URL}?availability=1&check=${Date.now()}_${attempt}`);
-          return Array.isArray(data.items) ? data.items : [];
+          const stamp = `${Date.now()}_${attempt}`;
+          const results = await Promise.allSettled([
+            jsonp(`${GOOGLE_SCRIPT_URL}?availability=1&check=${stamp}`),
+            jsonp(`${GOOGLE_SCRIPT_URL}?all=1&check=${stamp}`)
+          ]);
+          const fulfilled = results.filter(result => result.status === "fulfilled").map(result => result.value);
+          if (fulfilled.length) return mergeAvailabilityItems(fulfilled);
+          throw results.find(result => result.status === "rejected")?.reason || new Error("availability check failed");
         } catch (error) {
           lastError = error;
           await new Promise(resolve => setTimeout(resolve, 450));

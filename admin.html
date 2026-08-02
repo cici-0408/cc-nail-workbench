@@ -1558,14 +1558,9 @@
 
     <section class="client-site" id="pricePage" aria-label="客人价目表和预约须知">
       <div class="sheet-section">
-        <h2 class="sheet-title">· 本甲 ·</h2>
-        <div class="price-row"><span>本甲</span><span>$55</span></div>
-      </div>
-      <div class="sheet-section">
         <h2 class="sheet-title">· 延长 ·</h2>
-        <div class="price-row"><span>月牙半贴（建构+塑形）</span><span>$100</span></div>
-        <div class="price-row"><span>浅贴（建构+塑形）</span><span>$100</span></div>
-        <div class="price-row"><span>甲片二次利用</span><span>$65</span></div>
+        <div class="price-row"><span>月牙半贴/浅贴（建构+塑形）</span><span>$100</span></div>
+        <div class="price-row"><span>甲片二次利用</span><span>$85</span></div>
         <p class="price-note">延长甲片会挑选更适合你的甲型。</p>
       </div>
       <div class="sheet-section">
@@ -1629,9 +1624,8 @@
           <label for="quoteExtension">本甲/延长</label>
           <select id="quoteExtension">
             <option value="55">本甲 $55</option>
-            <option value="100">月牙半贴（建构+塑形） $100</option>
-            <option value="100">浅贴（建构+塑形） $100</option>
-            <option value="65">甲片二次利用 $65</option>
+            <option value="100">延长（建构+塑形） $100</option>
+            <option value="85">二次利用 $85</option>
           </select>
         </div>
         <div class="grid-2">
@@ -2085,10 +2079,10 @@
       ["本甲 $55", 55],
       ["本甲", 55],
       ["延长（建构+塑形）", 100],
-      ["二次利用", 65],
+      ["二次利用", 85],
       ["月牙半贴（建构+塑形）", 100],
       ["浅贴（建构+塑形）", 100],
-      ["甲片二次利用", 65],
+      ["甲片二次利用", 85],
       ["简单款式", 55],
       ["手绘款式", 65],
       ["复杂款式", 75],
@@ -2437,7 +2431,7 @@
     function serviceBasePrice(service) {
       const found = servicePresets.find(([name]) => name === service);
       if (String(service || "").includes("延长") || String(service || "").includes("月牙半贴") || String(service || "").includes("浅贴")) return 100;
-      if (String(service || "").includes("二次利用") || String(service || "").includes("甲片二次")) return 65;
+      if (String(service || "").includes("二次利用") || String(service || "").includes("甲片二次")) return 85;
       if (String(service || "") === "本甲") return 55;
       return found ? found[1] : 0;
     }
@@ -2836,6 +2830,7 @@
       return {
         action: "updateStatus",
         id: record.cloudId || "",
+        source: isAdminCloudBlock(record) ? "adminBlock" : "adminUpdate",
         name: record.client || "",
         contact: record.phone || "",
         date: record.date || "",
