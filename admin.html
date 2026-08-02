@@ -2357,6 +2357,7 @@
         styleImage: existing?.styleImage || "",
         cloudId: existing?.cloudId || "",
         cloudBlockDate: existing?.cloudBlockDate || "",
+        cloudBlockTime: existing?.cloudBlockTime || "",
         updatedAt: new Date().toISOString()
       };
     }
@@ -2853,13 +2854,26 @@
       } catch {}
     }
 
+    function isAdminCloudBlock(record) {
+      return String(record?.cloudId || "").startsWith("admin-") || String(record?.notes || "").includes("后台预约占位");
+    }
+
+    function adminCloudBlockId(record) {
+      return String(record?.cloudId || "").startsWith("admin-") ? record.cloudId : `admin-${record.id}`;
+    }
+
     async function syncManualCloudBlock(record) {
-      if (!GOOGLE_SCRIPT_URL || record?.cloudId || record?.cloudBlockDate === record?.date) return record;
+      if (!GOOGLE_SCRIPT_URL || !record?.id) return record;
+      if (record?.cloudId && !isAdminCloudBlock(record)) return record;
+      const blockId = adminCloudBlockId(record);
+      if (record?.cloudBlockDate === record?.date && record?.cloudBlockTime === record?.time) return { ...record, cloudId: blockId };
       try {
         await fetch(GOOGLE_SCRIPT_URL, {
           method: "POST",
           mode: "no-cors",
           body: new URLSearchParams({
+            action: "updateStatus",
+            id: blockId,
             source: "adminBlock",
             name: record.client || "Cc Nail 已占位",
             contact: record.phone || "admin",
@@ -2875,9 +2889,57 @@
             updatedAt: new Date().toISOString()
           })
         });
-        return { ...record, cloudBlockDate: record.date };
+        return { ...record, cloudId: blockId, cloudBlockDate: record.date, cloudBlockTime: record.time };
       } catch {
         return record;
+      }
+    }
+
+    async function cancelManualCloudBlock(record) {
+      if (!GOOGLE_SCRIPT_URL || !record?.id || !isAdminCloudBlock(record)) return;
+      try {
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: new URLSearchParams({
+            action: "updateStatus",
+            id: adminCloudBlockId(record),
+            source: "adminBlock",
+            name: record.client || "Cc Nail 已占位",
+            contact: record.phone || "admin",
+            date: record.date || "",
+            time: record.time || APPOINTMENT_DEFAULT_TIME,
+            service: record.service || "后台预约",
+            notes: `后台预约占位已取消：${record.client || "客人"} ${record.service || ""}`,
+            status: "cancelled",
+            statusText: "后台已取消占位",
+            updatedAt: new Date().toISOString()
+          })
+        });
+      } catch {}
+    }
+
+    async function syncPendingManualBlocks() {
+      if (!GOOGLE_SCRIPT_URL || !state.records.length) return;
+      let changed = false;
+      const synced = [];
+      for (const record of state.records) {
+        if (!record.date || !record.time) {
+          synced.push(record);
+          continue;
+        }
+        if (record.cloudId && !isAdminCloudBlock(record)) {
+          synced.push(record);
+          continue;
+        }
+        const updated = await syncManualCloudBlock(record);
+        changed ||= updated.cloudId !== record.cloudId || updated.cloudBlockDate !== record.cloudBlockDate || updated.cloudBlockTime !== record.cloudBlockTime;
+        synced.push(updated);
+      }
+      if (changed) {
+        state.records = synced;
+        saveAll();
+        render();
       }
     }
 
@@ -3092,11 +3154,12 @@
       window.scrollTo({ top: document.querySelector(".layout").offsetTop - 12, behavior: "smooth" });
     }
 
-    function deleteRecord(id) {
+    async function deleteRecord(id) {
       const record = state.records.find(item => item.id === id);
       if (!record) return;
       const ok = confirm(`删除 ${record.client} 的预约记录吗？`);
       if (!ok) return;
+      await cancelManualCloudBlock(record);
       state.records = state.records.filter(item => item.id !== id);
       if (state.editingId === id) resetForm();
       render();
@@ -3367,6 +3430,7 @@
     resetInquiryForm();
     updateQuote();
     render();
+    syncPendingManualBlocks();
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js");
     }

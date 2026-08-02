@@ -894,6 +894,11 @@
 
     function isActiveBooking(item) {
       const status = String(item.status || "").toLowerCase();
+      const source = String(item.source || "").toLowerCase();
+      const notes = String(item.notes || "");
+      if (source === "adminblock" || notes.includes("后台预约占位")) {
+        return status !== "cancelled" && status !== "canceled";
+      }
       return status !== "cancelled" && status !== "canceled";
     }
 
