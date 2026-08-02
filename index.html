@@ -925,7 +925,7 @@
           otherMonth ? "blank" : "",
           iso === selected ? "selected" : "",
           isPast ? "past" : "",
-          isFull ? "full" : "",
+          isFull && !isPast ? "full" : "",
           !isPast && !isFull && !otherMonth ? "available" : ""
         ].filter(Boolean).join(" ");
         const disabled = otherMonth || isPast || isFull ? "disabled" : "";
