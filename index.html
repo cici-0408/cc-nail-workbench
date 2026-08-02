@@ -322,6 +322,115 @@
       color: #7d5263;
     }
 
+    .booking-calendar {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 250, 253, 0.9);
+    }
+
+    .calendar-top {
+      display: grid;
+      grid-template-columns: 42px 1fr 42px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .calendar-title {
+      text-align: center;
+      color: var(--text);
+      font-weight: 950;
+    }
+
+    .calendar-nav {
+      min-height: 36px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--main);
+      font-weight: 950;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .calendar-weekday {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .calendar-day {
+      min-height: 38px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .calendar-day.available {
+      background: #fff0f6;
+      color: var(--main);
+      border-color: rgba(191, 93, 134, 0.28);
+    }
+
+    .calendar-day.selected {
+      background: linear-gradient(135deg, var(--main), #e990b3);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 8px 16px rgba(191, 93, 134, 0.2);
+    }
+
+    .calendar-day.full,
+    .calendar-day.past {
+      cursor: not-allowed;
+      background: #2d2227;
+      color: rgba(255, 255, 255, 0.68);
+      border-color: #2d2227;
+    }
+
+    .calendar-day.blank {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .calendar-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .legend-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-dot::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #fff0f6;
+      border: 1px solid rgba(191, 93, 134, 0.28);
+    }
+
+    .legend-dot.full::before {
+      background: #2d2227;
+      border-color: #2d2227;
+    }
+
     .deposit-step {
       display: none;
       margin-top: 12px;
@@ -640,6 +749,18 @@
             </select>
           </div>
         </div>
+        <div class="booking-calendar" id="bookingCalendar" aria-label="可预约日历">
+          <div class="calendar-top">
+            <button class="calendar-nav" id="calendarPrev" type="button">‹</button>
+            <div class="calendar-title" id="calendarTitle">查看空位</div>
+            <button class="calendar-nav" id="calendarNext" type="button">›</button>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <div class="calendar-legend">
+            <span class="legend-dot">粉色可约</span>
+            <span class="legend-dot full">黑色已满</span>
+          </div>
+        </div>
         <div class="slot-status" id="slotStatus">请选择日期，会自动查看当天是否还有空位。</div>
         <div>
           <label for="service">想做项目</label>
@@ -695,6 +816,11 @@
     const CUSTOMER_APPOINTMENT_KEY = "ccNail.customerAppointment.v1";
     const APPOINTMENT_TIME_LABEL = "13:00-17:00";
     const availabilityCache = new Map();
+    const customerCalendar = {
+      month: "",
+      bookedDates: new Set(),
+      loaded: false
+    };
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const ids = id => document.getElementById(id);
     let isChangingAppointment = false;
@@ -746,6 +872,93 @@
 
     function selectedDateTimeLabel(date = ids("date")?.value, time = ids("time")?.value) {
       return `${formatDisplayDate(date)} ${formatDisplayTime(time)}`;
+    }
+
+    function calendarMonthDate(yearMonth, day = 1) {
+      return new Date(`${yearMonth}-${String(day).padStart(2, "0")}T00:00:00`);
+    }
+
+    function localDateISO(date) {
+      const offset = date.getTimezoneOffset();
+      return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
+    }
+
+    function renderCustomerCalendar() {
+      const grid = ids("calendarGrid");
+      if (!grid) return;
+      const activeMonth = customerCalendar.month || todayISO().slice(0, 7);
+      const first = calendarMonthDate(activeMonth);
+      const year = first.getFullYear();
+      const month = first.getMonth();
+      const title = ids("calendarTitle");
+      if (title) title.textContent = `${year}年${String(month + 1).padStart(2, "0")}月`;
+
+      const mondayOffset = first.getDay() === 0 ? 6 : first.getDay() - 1;
+      const gridStart = new Date(first);
+      gridStart.setDate(first.getDate() - mondayOffset);
+      const today = todayISO();
+      const selected = formatDisplayDate(ids("date")?.value || today);
+      const weekdays = ["一", "二", "三", "四", "五", "六", "日"]
+        .map(day => `<div class="calendar-weekday">${day}</div>`)
+        .join("");
+      const days = Array.from({ length: 42 }, (_, index) => {
+        const date = new Date(gridStart);
+        date.setDate(gridStart.getDate() + index);
+        const iso = localDateISO(date);
+        const otherMonth = date.getMonth() !== month;
+        const isPast = iso < today;
+        const isFull = customerCalendar.bookedDates.has(iso);
+        const classes = [
+          "calendar-day",
+          otherMonth ? "blank" : "",
+          iso === selected ? "selected" : "",
+          isPast ? "past" : "",
+          isFull ? "full" : "",
+          !isPast && !isFull && !otherMonth ? "available" : ""
+        ].filter(Boolean).join(" ");
+        const disabled = otherMonth || isPast || isFull ? "disabled" : "";
+        const label = isFull ? `${iso} 已满` : `${iso} 可约`;
+        return `<button class="${classes}" type="button" data-date="${iso}" ${disabled} aria-label="${label}">${date.getDate()}</button>`;
+      }).join("");
+      grid.innerHTML = weekdays + days;
+    }
+
+    function shiftCustomerCalendar(delta) {
+      const base = calendarMonthDate(customerCalendar.month || todayISO().slice(0, 7));
+      base.setMonth(base.getMonth() + delta);
+      customerCalendar.month = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}`;
+      renderCustomerCalendar();
+      refreshCalendarAvailability();
+    }
+
+    function updateBookedDatesFromAvailability(data = {}) {
+      const booked = new Set();
+      (data.bookedDates || []).forEach(date => {
+        const normalized = formatDisplayDate(date);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) booked.add(normalized);
+      });
+      (data.items || []).forEach(item => {
+        const normalized = formatDisplayDate(item.date);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized) && isActiveBooking(item)) booked.add(normalized);
+      });
+      customerCalendar.bookedDates = booked;
+      customerCalendar.loaded = true;
+      renderCustomerCalendar();
+    }
+
+    async function refreshCalendarAvailability() {
+      if (!GOOGLE_SCRIPT_URL) {
+        customerCalendar.loaded = true;
+        renderCustomerCalendar();
+        return;
+      }
+      try {
+        const availability = await loadAvailabilityItems(2);
+        updateBookedDatesFromAvailability(availability);
+      } catch {
+        customerCalendar.loaded = true;
+        renderCustomerCalendar();
+      }
     }
 
     function normalizeAppointmentPayload(payload = {}) {
@@ -965,6 +1178,7 @@
       if (cached && !options.force && Date.now() - cached.checkedAt < 30000) {
         setSlotStatus(cached.available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, cached.available ? "open" : "full");
         setBookingAvailableState(cached.available);
+        renderCustomerCalendar();
         return cached.available;
       }
       if (!GOOGLE_SCRIPT_URL) {
@@ -976,6 +1190,7 @@
       setBookingAvailableState(null);
       try {
         const availability = await loadAvailabilityItems(2);
+        updateBookedDatesFromAvailability(availability);
         const items = availability.items || [];
         const takenByDate = (availability.bookedDates || []).includes(formatDisplayDate(date));
         const takenByItem = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
@@ -1177,6 +1392,8 @@
       };
       saveCustomerAppointment(confirmedPayload);
       availabilityCache.set(payload.date, { available: false, checkedAt: Date.now() });
+      customerCalendar.bookedDates.add(payload.date);
+      renderCustomerCalendar();
       setSlotStatus("这天已为你预约成功。", "full");
       const button = ids("confirmPayment");
       button.disabled = true;
@@ -1206,8 +1423,24 @@
     });
     ids("date").value = todayISO();
     ids("date").min = todayISO();
-    ids("date").addEventListener("change", () => checkDateAvailability(ids("date").value, { force: true }));
+    customerCalendar.month = ids("date").value.slice(0, 7);
+    renderCustomerCalendar();
+    ids("date").addEventListener("change", () => {
+      customerCalendar.month = ids("date").value.slice(0, 7);
+      renderCustomerCalendar();
+      checkDateAvailability(ids("date").value, { force: true });
+    });
     ids("time").addEventListener("change", () => checkDateAvailability(ids("date").value));
+    ids("calendarPrev").addEventListener("click", () => shiftCustomerCalendar(-1));
+    ids("calendarNext").addEventListener("click", () => shiftCustomerCalendar(1));
+    ids("calendarGrid").addEventListener("click", event => {
+      const button = event.target.closest("button[data-date]");
+      if (!button || button.disabled) return;
+      ids("date").value = button.dataset.date;
+      customerCalendar.month = button.dataset.date.slice(0, 7);
+      renderCustomerCalendar();
+      checkDateAvailability(button.dataset.date, { force: true });
+    });
     setBookingAvailableState(null);
     ids("copyRequest").addEventListener("click", prepareDepositPayment);
     ids("confirmPayment").addEventListener("click", submitPaidBooking);
@@ -1227,6 +1460,7 @@
       if (event.target.closest("#changeAppointment")) changeAppointment();
     });
     updateQuote();
+    refreshCalendarAvailability();
     checkDateAvailability(ids("date").value);
     renderCustomerAppointment();
     refreshCustomerAppointment(true);
