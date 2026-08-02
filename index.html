@@ -685,6 +685,7 @@
     const availabilityCache = new Map();
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const ids = id => document.getElementById(id);
+    let isChangingAppointment = false;
 
     function num(value) {
       const parsed = Number(value);
@@ -810,7 +811,33 @@
         ${item.adminNote ? `<p>确认备注：${escapeHtml(item.adminNote)}</p>` : ""}
         <span class="status">${escapeHtml(item.statusText || "预约已确认，已收到定金截图")}</span>
         <button type="button" id="refreshAppointmentStatus">刷新预约状态</button>
+        <button type="button" id="changeAppointment">更改预约</button>
       `;
+    }
+
+    function changeAppointment() {
+      const saved = localStorage.getItem(CUSTOMER_APPOINTMENT_KEY);
+      if (!saved) return;
+      const item = normalizeAppointmentPayload(JSON.parse(saved));
+      ids("name").value = item.name || "";
+      ids("contact").value = item.contact || "";
+      ids("date").value = formatDisplayDate(item.date) === "待确认" ? todayISO() : formatDisplayDate(item.date);
+      ids("time").value = formatDisplayTime(item.time) === "待确认" ? "13:00" : formatDisplayTime(item.time);
+      ids("service").value = item.service || "本甲";
+      ids("removalNeed").value = item.removalNeed || "不需要卸甲";
+      ids("notes").value = item.styleNotes || item.notes || "";
+      ids("depositStep").classList.remove("is-visible");
+      ids("paymentProof").value = "";
+      ids("paymentPreview").classList.remove("is-visible");
+      ids("copyRequest").disabled = false;
+      ids("copyRequest").textContent = "提交更改预约";
+      ids("confirmPayment").disabled = false;
+      ids("confirmPayment").textContent = "我已支付并上传截图，确认预约";
+      ids("submitHint").textContent = "更改预约不需要重新上传定金截图，提交后 Cc Nail 会收到新的预约时间。";
+      isChangingAppointment = true;
+      updateQuote();
+      checkDateAvailability(ids("date").value, { force: true });
+      ids("booking").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function saveCustomerAppointment(payload) {
@@ -962,6 +989,10 @@
     }
 
     async function prepareDepositPayment() {
+      if (isChangingAppointment) {
+        await submitAppointmentChange();
+        return;
+      }
       const payload = requestPayload();
       if (!validateBookingPayload(payload)) return;
       const available = await checkDateAvailability(payload.date, { force: true });
@@ -975,6 +1006,48 @@
       ids("depositStep").classList.add("is-visible");
       ids("submitHint").textContent = "请支付 $10 定金并上传截图，上传后会自动确认预约。";
       ids("depositStep").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    async function submitAppointmentChange() {
+      const payload = requestPayload();
+      if (!validateBookingPayload(payload)) return;
+      const available = await checkDateAvailability(payload.date, { force: true });
+      if (available === false) {
+        alert("这一天已经没有空位啦，请换一天预约。");
+        return;
+      }
+      const changedPayload = {
+        ...payload,
+        status: "deposit",
+        statusText: "更改预约已提交，已保留原定金",
+        depositReceived: "$10",
+        adminNote: "客户提交更改预约，无需重新上传定金截图。",
+        notes: `${payload.notes}\n客户提交更改预约，无需重新上传定金截图`
+      };
+      const button = ids("copyRequest");
+      button.disabled = true;
+      button.textContent = "提交中...";
+      try {
+        if (!GOOGLE_SCRIPT_URL) {
+          await copyText(requestText());
+        } else {
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            body: new URLSearchParams(changedPayload)
+          });
+        }
+        saveCustomerAppointment(changedPayload);
+        showConfirmModal(changedPayload);
+        ids("depositStep").classList.remove("is-visible");
+        ids("submitHint").textContent = "更改预约已提交，可以刷新预约状态查看更新。";
+        isChangingAppointment = false;
+      } catch {
+        await copyText(requestText());
+      } finally {
+        button.disabled = false;
+        button.textContent = isChangingAppointment ? "提交更改预约" : "下一步：查看定金账号";
+      }
     }
 
     function fileToImageDataUrl(file) {
@@ -1071,6 +1144,7 @@
     });
     document.addEventListener("click", event => {
       if (event.target.closest("#refreshAppointmentStatus")) refreshCustomerAppointment();
+      if (event.target.closest("#changeAppointment")) changeAppointment();
     });
     updateQuote();
     checkDateAvailability(ids("date").value);
