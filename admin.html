@@ -2835,6 +2835,7 @@
           <span class="mini-actions">
             <button class="tiny" type="button" data-action="reschedule" data-id="${escapeHtml(record.id)}">改期</button>
             <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">编辑全部</button>
+            <button class="tiny" type="button" data-action="deleteSchedule" data-id="${escapeHtml(record.id)}">删除</button>
           </span>
         </div>
       `).join("");
@@ -3782,6 +3783,7 @@
       if (!button) return;
       if (button.dataset.action === "reschedule") rescheduleRecord(button.dataset.id);
       if (button.dataset.action === "editSchedule") editRecord(button.dataset.id);
+      if (button.dataset.action === "deleteSchedule") deleteRecord(button.dataset.id);
     });
     els.quickServices.addEventListener("click", event => {
       const button = event.target.closest("button[data-service]");
