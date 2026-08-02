@@ -3855,6 +3855,11 @@
         showAdminPage(link.dataset.page);
       });
     });
+    window.addEventListener("hashchange", () => {
+      if (location.hash && location.hash !== "#admin" && location.hash !== "#customer") {
+        showAdminPage(location.hash.slice(1));
+      }
+    });
     els.selectedDate.addEventListener("change", () => {
       document.querySelector("#date").value = els.selectedDate.value;
       state.calendarMonth = els.selectedDate.value.slice(0, 7);
