@@ -615,6 +615,72 @@
       font-weight: 700;
     }
 
+    .smart-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 18px 18px;
+    }
+
+    .smart-card {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fffafd, #fff);
+      box-shadow: 0 10px 24px rgba(166, 82, 118, 0.07);
+    }
+
+    .smart-card.alert {
+      background: linear-gradient(180deg, #fff0f6, #fffafd);
+      border-color: rgba(191, 93, 134, 0.34);
+    }
+
+    .smart-card.good {
+      background: linear-gradient(180deg, #f7fffb, #fff);
+      border-color: rgba(81, 119, 105, 0.2);
+    }
+
+    .smart-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .smart-card strong {
+      display: block;
+      margin: 7px 0 6px;
+      color: var(--cherry);
+      font-size: 20px;
+      line-height: 1.18;
+    }
+
+    .smart-card small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 750;
+    }
+
+    .smart-card ul {
+      display: grid;
+      gap: 4px;
+      margin: 8px 0 0;
+      padding: 0;
+      list-style: none;
+      color: var(--coffee);
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 800;
+    }
+
+    .smart-card li::before {
+      content: "· ";
+      color: var(--pink-600);
+    }
+
     .layout {
       display: grid;
       grid-template-columns: 380px minmax(0, 1fr);
@@ -1191,6 +1257,31 @@
       font-size: 13px;
     }
 
+    .record-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--coffee);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .meta-pill.warn {
+      color: var(--pink-600);
+      background: var(--pink-100);
+    }
+
     .style-thumb {
       width: 100%;
       max-width: 120px;
@@ -1308,7 +1399,8 @@
         grid-template-columns: repeat(2, 1fr);
       }
 
-      .assistant-grid {
+      .assistant-grid,
+      .smart-board {
         grid-template-columns: repeat(2, 1fr);
       }
 
@@ -1404,6 +1496,7 @@
 
       .stats,
       .assistant-grid,
+      .smart-board,
       .grid-2 {
         grid-template-columns: 1fr;
       }
@@ -1432,6 +1525,7 @@
       .form,
       .mini-list,
       .list,
+      .smart-board,
       .calendar,
       .notice-body {
         padding-left: 14px;
@@ -1832,6 +1926,14 @@
       </div>
     </section>
 
+    <section class="panel admin-focus" aria-label="智能提醒" data-admin-page="adminHome">
+      <div class="panel-head">
+        <h2>智能提醒</h2>
+        <span class="status" id="smartSummary">自动检查</span>
+      </div>
+      <div class="smart-board" id="smartInsights"></div>
+    </section>
+
     <section class="panel admin-focus" aria-label="今日待办" data-admin-page="adminHome">
       <div class="panel-head">
         <h2>今日待办</h2>
@@ -2155,6 +2257,8 @@
       balanceAssistantHint: document.querySelector("#balanceAssistantHint"),
       backupAssistant: document.querySelector("#backupAssistant"),
       backupAssistantHint: document.querySelector("#backupAssistantHint"),
+      smartInsights: document.querySelector("#smartInsights"),
+      smartSummary: document.querySelector("#smartSummary"),
       adminTasks: document.querySelector("#adminTasks"),
       adminTaskSummary: document.querySelector("#adminTaskSummary"),
       cloudInboxList: document.querySelector("#cloudInboxList"),
@@ -2482,6 +2586,52 @@
       return Math.max(0, finalAmount(record) - paidAmount(record));
     }
 
+    function activeRecords(records = state.records) {
+      return records.filter(record => record.status !== "cancelled" && record.status !== "canceled");
+    }
+
+    function daysBetween(date) {
+      const base = new Date(`${todayISO()}T00:00:00`);
+      const target = new Date(`${formatDisplayDate(date)}T00:00:00`);
+      return Math.round((target - base) / 86400000);
+    }
+
+    function recordsForDate(date, records = state.records) {
+      const wanted = formatDisplayDate(date);
+      return activeRecords(records).filter(record => formatDisplayDate(record.date) === wanted);
+    }
+
+    function conflictDates() {
+      const grouped = new Map();
+      activeRecords().forEach(record => {
+        const date = formatDisplayDate(record.date);
+        if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+        const list = grouped.get(date) || [];
+        list.push(record);
+        grouped.set(date, list);
+      });
+      return [...grouped.entries()]
+        .filter(([, records]) => records.length > 1)
+        .sort((a, b) => a[0].localeCompare(b[0]));
+    }
+
+    function paymentState(record) {
+      if (record.status === "paid") return { label: "已结清", className: "good" };
+      if (record.status === "deposit") return { label: `待收尾款 ${money.format(outstandingAmount(record))}`, className: "warn" };
+      return { label: "待收定金", className: "warn" };
+    }
+
+    function recordRiskNotes(record) {
+      const notes = [];
+      const sameDay = recordsForDate(record.date).filter(item => item.id !== record.id);
+      if (sameDay.length) notes.push("同日已有预约");
+      if (record.status === "unpaid") notes.push("未收定金");
+      if (record.status === "deposit" && outstandingAmount(record) > 0) notes.push("未收尾款");
+      if (!record.phone) notes.push("缺联系方式");
+      if (daysBetween(record.date) === 0) notes.push("今日到店");
+      return notes;
+    }
+
     function monthDate(yearMonth, day = 1) {
       return new Date(`${yearMonth}-${String(day).padStart(2, "0")}T00:00:00`);
     }
@@ -2533,6 +2683,85 @@
       els.balanceAssistantHint.textContent = depositRecords.length ? `${depositRecords.length} 位客人已付定金，待收尾款。` : "当前没有待收尾款。";
       els.backupAssistant.textContent = state.records.length ? `${state.records.length} 条记录` : "未开始";
       els.backupAssistantHint.textContent = lastBackup ? `上次导出：${lastBackup}` : "建议每周点一次“导出备份”。";
+    }
+
+    function smartList(items) {
+      return items.length ? `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "";
+    }
+
+    function smartCard(title, value, hint, items = [], className = "") {
+      return `
+        <article class="smart-card ${className}">
+          <span>${escapeHtml(title)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(hint)}</small>
+          ${smartList(items)}
+        </article>
+      `;
+    }
+
+    function renderSmartInsights() {
+      if (!els.smartInsights) return;
+      const today = todayISO();
+      const todayRecords = recordsForDate(today).sort((a, b) => formatDisplayTime(a.time).localeCompare(formatDisplayTime(b.time)));
+      const unpaidRecords = activeRecords().filter(record => record.status === "unpaid");
+      const depositRecords = activeRecords().filter(record => record.status === "deposit" && outstandingAmount(record) > 0);
+      const upcoming = activeRecords()
+        .filter(record => daysBetween(record.date) >= 0 && daysBetween(record.date) <= 7)
+        .sort((a, b) => `${formatDisplayDate(a.date)} ${formatDisplayTime(a.time)}`.localeCompare(`${formatDisplayDate(b.date)} ${formatDisplayTime(b.time)}`));
+      const conflicts = conflictDates();
+      const clientCounts = new Map();
+      activeRecords().forEach(record => {
+        const key = String(record.client || "").trim();
+        if (!key) return;
+        clientCounts.set(key, (clientCounts.get(key) || 0) + 1);
+      });
+      const repeatClients = [...clientCounts.entries()].filter(([, count]) => count > 1).sort((a, b) => b[1] - a[1]);
+      const cards = [
+        smartCard(
+          "今天客人",
+          todayRecords.length ? `${todayRecords.length} 位` : "无预约",
+          todayRecords.length ? "今日待办只显示今天到店客人。" : "今天暂时空着，可以安排新预约。",
+          todayRecords.slice(0, 3).map(record => `${formatDisplayTime(record.time)} ${record.client || "未命名"} · ${record.service || "待确认"}`),
+          todayRecords.length ? "alert" : "good"
+        ),
+        smartCard(
+          "未收定金",
+          unpaidRecords.length ? `${unpaidRecords.length} 单` : "已清空",
+          unpaidRecords.length ? "这些客人还没锁档，优先跟进。" : "没有未收定金的待处理订单。",
+          unpaidRecords.slice(0, 3).map(record => `${formatDisplayDate(record.date).slice(5)} ${record.client || "未命名"} · ${record.service || "待确认"}`),
+          unpaidRecords.length ? "alert" : "good"
+        ),
+        smartCard(
+          "待收尾款",
+          money.format(sum(depositRecords, outstandingAmount)),
+          depositRecords.length ? `${depositRecords.length} 单已收定金，结账时别漏。` : "目前没有待收尾款。",
+          depositRecords.slice(0, 3).map(record => `${record.client || "未命名"} · ${money.format(outstandingAmount(record))}`),
+          depositRecords.length ? "alert" : "good"
+        ),
+        smartCard(
+          "档期冲突",
+          conflicts.length ? `${conflicts.length} 天` : "无冲突",
+          conflicts.length ? "一天只接一位，这些日期要处理。" : "当前没有同日多单。",
+          conflicts.slice(0, 3).map(([date, records]) => `${date} · ${records.length} 单`),
+          conflicts.length ? "alert" : "good"
+        ),
+        smartCard(
+          "7天内预约",
+          upcoming.length ? `${upcoming.length} 单` : "暂无",
+          upcoming.length ? "未来一周排期在这里快速扫一眼。" : "一周内还没有排期。",
+          upcoming.slice(0, 3).map(record => `${formatDisplayDate(record.date).slice(5)} ${formatDisplayTime(record.time)} · ${record.client || "未命名"}`)
+        ),
+        smartCard(
+          "回头客",
+          repeatClients.length ? `${repeatClients.length} 位` : "待积累",
+          repeatClients.length ? "重复客人可以备注偏好、常做款式。" : "多来几次后这里会自动识别。",
+          repeatClients.slice(0, 3).map(([name, count]) => `${name} · ${count} 次`)
+        )
+      ];
+      const warningCount = unpaidRecords.length + depositRecords.length + conflicts.length;
+      els.smartSummary.textContent = warningCount ? `${warningCount} 个提醒` : "状态很好";
+      els.smartInsights.innerHTML = cards.join("");
     }
 
     function renderCalendar() {
@@ -2590,9 +2819,9 @@
         <div class="mini-row">
           <span>
             <strong>${escapeHtml(formatDisplayTime(record.time))} · ${escapeHtml(record.client || "未命名客人")}</strong>
-            <small>${escapeHtml(record.service || "待确认项目")} · ${escapeHtml(statusLabel(record.status))} · ${money.format(finalAmount(record))}</small>
+            <small>${escapeHtml(record.service || "待确认项目")} · ${escapeHtml(statusLabel(record.status))} · 总价 ${money.format(finalAmount(record))} · 待收 ${money.format(outstandingAmount(record))}</small>
           </span>
-          <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">编辑</button>
+          <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">改期/编辑</button>
         </div>
       `).join("");
     }
@@ -3021,6 +3250,7 @@
       els.recordsList.innerHTML = records.map(record => {
         const actual = finalAmount(record);
         const paid = paidAmount(record);
+        const balance = outstandingAmount(record);
         const discount = toNumber(record.discount);
         const extraFee = toNumber(record.extraFee);
         const discountText = discount > 0 && discount < 10 ? `${discount}折` : "无折扣";
@@ -3028,12 +3258,21 @@
         const phoneText = record.phone ? ` · ${escapeHtml(record.phone)}` : "";
         const notes = record.notes ? `<p>${escapeHtml(record.notes)}</p>` : "";
         const styleImage = record.styleImage ? `<img class="style-thumb" src="${record.styleImage}" alt="款式图片">` : "";
+        const payment = paymentState(record);
+        const riskNotes = recordRiskNotes(record);
+        const meta = [
+          `<span class="meta-pill ${payment.className}">${escapeHtml(payment.label)}</span>`,
+          `<span class="meta-pill">定金 ${money.format(toNumber(record.deposit))}</span>`,
+          `<span class="meta-pill">尾款 ${money.format(balance)}</span>`,
+          ...riskNotes.map(note => `<span class="meta-pill warn">${escapeHtml(note)}</span>`)
+        ].join("");
         return `
           <article class="record">
             <div class="time">${escapeHtml(formatDisplayDate(record.date).slice(5))}<br>${escapeHtml(formatDisplayTime(record.time))}</div>
             <div>
               <h3>${escapeHtml(record.client)}${phoneText}</h3>
               <p>${escapeHtml(record.service)} · 原价 ${money.format(record.price)} · ${discountText}${extraFeeText}</p>
+              <div class="record-meta">${meta}</div>
               ${notes}
             </div>
             ${styleImage}
@@ -3043,7 +3282,7 @@
             </div>
             <div class="record-actions">
               <button class="tiny" type="button" data-action="copyMessage" data-id="${record.id}">复制通知</button>
-              <button class="tiny" type="button" data-action="edit" data-id="${record.id}">编辑</button>
+              <button class="tiny" type="button" data-action="edit" data-id="${record.id}">改期/编辑</button>
               <button class="tiny" type="button" data-action="markDeposit" data-id="${record.id}">收定金</button>
               <button class="tiny" type="button" data-action="togglePaid" data-id="${record.id}">${record.status === "paid" ? "设为未付" : "设为已付"}</button>
               <button class="tiny" type="button" data-action="delete" data-id="${record.id}">删除</button>
@@ -3146,6 +3385,7 @@
     function render() {
       renderStats();
       renderAdminAssistant();
+      renderSmartInsights();
       renderAdminTasks();
       renderCloudInbox();
       renderCalendar();
