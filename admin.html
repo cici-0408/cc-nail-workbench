@@ -2074,6 +2074,7 @@
     const DISMISSED_CLOUD_KEY = "personalNailWorkbench.dismissedCloud.v1";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const APPOINTMENT_DEFAULT_TIME = "13:00";
+    const CLOUD_BLOCK_SYNC_VERSION = "v21";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -2363,6 +2364,7 @@
         cloudId: existing?.cloudId || "",
         cloudBlockDate: existing?.cloudBlockDate || "",
         cloudBlockTime: existing?.cloudBlockTime || "",
+        cloudBlockSyncVersion: existing?.cloudBlockSyncVersion || "",
         updatedAt: new Date().toISOString()
       };
     }
@@ -2870,7 +2872,13 @@
       if (!GOOGLE_SCRIPT_URL || !record?.id) return record;
       if (record?.cloudId && !isAdminCloudBlock(record)) return record;
       const blockId = adminCloudBlockId(record);
-      if (record?.cloudBlockDate === record?.date && record?.cloudBlockTime === record?.time) return { ...record, cloudId: blockId };
+      if (
+        record?.cloudBlockDate === record?.date &&
+        record?.cloudBlockTime === record?.time &&
+        record?.cloudBlockSyncVersion === CLOUD_BLOCK_SYNC_VERSION
+      ) {
+        return { ...record, cloudId: blockId };
+      }
       try {
         await fetch(GOOGLE_SCRIPT_URL, {
           method: "POST",
@@ -2893,7 +2901,7 @@
             updatedAt: new Date().toISOString()
           })
         });
-        return { ...record, cloudId: blockId, cloudBlockDate: record.date, cloudBlockTime: record.time };
+        return { ...record, cloudId: blockId, cloudBlockDate: record.date, cloudBlockTime: record.time, cloudBlockSyncVersion: CLOUD_BLOCK_SYNC_VERSION };
       } catch {
         return record;
       }
