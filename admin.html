@@ -326,6 +326,15 @@
       white-space: nowrap;
     }
 
+    .price-note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      font-weight: 850;
+      text-align: center;
+    }
+
     .tips-list {
       margin: 0;
       padding: 0 0 0 18px;
@@ -1542,9 +1551,10 @@
       </div>
       <div class="sheet-section">
         <h2 class="sheet-title">· 延长 ·</h2>
-        <div class="price-row"><span>月牙半贴（塑形+建构）</span><span>$85</span></div>
-        <div class="price-row"><span>浅贴（塑形+建构）</span><span>$100</span></div>
+        <div class="price-row"><span>月牙半贴（建构+塑形）</span><span>$100</span></div>
+        <div class="price-row"><span>浅贴（建构+塑形）</span><span>$100</span></div>
         <div class="price-row"><span>甲片二次利用</span><span>$65</span></div>
+        <p class="price-note">延长甲片会挑选更适合你的甲型。</p>
       </div>
       <div class="sheet-section">
         <h2 class="sheet-title">· 款式 ·</h2>
@@ -1607,8 +1617,8 @@
           <label for="quoteExtension">本甲/延长</label>
           <select id="quoteExtension">
             <option value="55">本甲 $55</option>
-            <option value="85">月牙半贴（塑形+建构） $85</option>
-            <option value="100">浅贴（塑形+建构） $100</option>
+            <option value="100">月牙半贴（建构+塑形） $100</option>
+            <option value="100">浅贴（建构+塑形） $100</option>
             <option value="65">甲片二次利用 $65</option>
           </select>
         </div>
@@ -1715,8 +1725,8 @@
           <label for="inquiryService">想做项目</label>
           <select id="inquiryService" name="service">
             <option>本甲 $55</option>
-            <option>月牙半贴（塑形+建构）</option>
-            <option>浅贴（塑形+建构）</option>
+            <option>月牙半贴（建构+塑形）</option>
+            <option>浅贴（建构+塑形）</option>
             <option>甲片二次利用</option>
             <option>简单款式</option>
             <option>手绘款式</option>
@@ -1973,8 +1983,8 @@
             <div class="quick-services" id="quickServices" aria-label="常用项目快捷选择"></div>
             <select id="service" name="service">
               <option>本甲 $55</option>
-              <option>月牙半贴（塑形+建构）</option>
-              <option>浅贴（塑形+建构）</option>
+              <option>月牙半贴（建构+塑形）</option>
+              <option>浅贴（建构+塑形）</option>
               <option>甲片二次利用</option>
               <option>简单款式</option>
               <option>手绘款式</option>
@@ -2065,8 +2075,8 @@
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
-      ["月牙半贴（塑形+建构）", 85],
-      ["浅贴（塑形+建构）", 100],
+      ["月牙半贴（建构+塑形）", 100],
+      ["浅贴（建构+塑形）", 100],
       ["甲片二次利用", 65],
       ["简单款式", 55],
       ["手绘款式", 65],

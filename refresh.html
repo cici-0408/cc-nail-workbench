@@ -34,7 +34,7 @@
   <main>
     <h1>正在更新 Cc Nail</h1>
     <p>正在清理旧版本缓存，马上跳转到新版预约页。</p>
-    <p><a id="fallback" href="./?v=manual-refresh-v14#booking">如果没有自动跳转，点这里打开新版</a></p>
+    <p><a id="fallback" href="./?v=manual-refresh-v15#booking">如果没有自动跳转，点这里打开新版</a></p>
   </main>
   <script>
     async function refreshApp() {
@@ -48,7 +48,7 @@
           await Promise.all(keys.map(key => caches.delete(key)));
         }
       } catch {}
-      location.replace("./?v=manual-refresh-v14#booking");
+      location.replace("./?v=manual-refresh-v15#booking");
     }
     refreshApp();
   </script>
