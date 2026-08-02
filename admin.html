@@ -2660,6 +2660,17 @@
       return String(item.id || `${item.createdAt || ""}-${item.name || ""}-${item.contact || ""}-${item.date || ""}`);
     }
 
+    function cloudStableKey(item) {
+      return [
+        "stable",
+        String(item.name || "").trim().toLowerCase(),
+        String(item.contact || "").trim().toLowerCase(),
+        formatDisplayDate(item.date),
+        formatDisplayTime(item.time),
+        String(item.service || "").trim().toLowerCase()
+      ].join("|");
+    }
+
     function importedCloudKeys() {
       return new Set(state.records.map(record => String(record.cloudId || "")));
     }
@@ -2676,7 +2687,7 @@
         return;
       }
       const imported = importedCloudKeys();
-      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)) && !dismissedCloudKeys.has(cloudKey(item)) && !String(item.notes || "").includes("后台预约占位"));
+      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)) && !dismissedCloudKeys.has(cloudKey(item)) && !dismissedCloudKeys.has(cloudStableKey(item)) && !String(item.notes || "").includes("后台预约占位"));
       els.cloudInboxSummary.textContent = `${pending.length} 条待确认`;
       if (!pending.length) {
         els.cloudInboxList.innerHTML = `<div class="empty">暂无新的客户提交。点“刷新客户提交”检查 Google 表格。</div>`;
@@ -2720,9 +2731,11 @@
     function deleteCloudInquiry(id) {
       if (!id) return;
       if (!confirm("确定从收件箱删除这条客户提交吗？")) return;
+      const item = state.cloudInquiries.find(entry => cloudKey(entry) === id);
       dismissedCloudKeys.add(id);
+      if (item) dismissedCloudKeys.add(cloudStableKey(item));
       saveDismissedCloudKeys();
-      state.cloudInquiries = state.cloudInquiries.filter(item => cloudKey(item) !== id);
+      state.cloudInquiries = state.cloudInquiries.filter(item => cloudKey(item) !== id && !dismissedCloudKeys.has(cloudStableKey(item)));
       renderCloudInbox();
       renderAdminAssistant();
     }
