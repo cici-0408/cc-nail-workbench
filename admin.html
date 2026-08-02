@@ -1822,6 +1822,7 @@
           </div>
           <div class="calendar-grid" id="calendarGrid"></div>
         </div>
+        <div class="mini-list" id="scheduleDayOrders"></div>
       </section>
 
       <div class="side-stack income-panel" id="incomeBoard">
@@ -2007,8 +2008,7 @@
         <div class="filters">
           <input id="search" type="search" placeholder="搜索客人、电话、项目">
           <select id="statusFilter">
-            <option value="all">全部状态</option>
-            <option value="paid">已付款</option>
+            <option value="all">待处理订单</option>
             <option value="unpaid">未付款</option>
             <option value="deposit">已付定金</option>
           </select>
@@ -2121,6 +2121,7 @@
       calendarTitle: document.querySelector("#calendarTitle"),
       calendarGrid: document.querySelector("#calendarGrid"),
       calendarSummary: document.querySelector("#calendarSummary"),
+      scheduleDayOrders: document.querySelector("#scheduleDayOrders"),
       clientList: document.querySelector("#clientList"),
       clientSummary: document.querySelector("#clientSummary"),
       serviceList: document.querySelector("#serviceList"),
@@ -2394,7 +2395,7 @@
       const query = els.search.value.trim().toLowerCase();
       const selectedDate = els.selectedDate.value;
       const status = els.statusFilter.value;
-      let records = [...state.records];
+      let records = state.records.filter(record => record.status !== "paid");
 
       if (state.mode === "daily") {
         records = records.filter(record => record.date === selectedDate);
@@ -2488,9 +2489,10 @@
       const startOffset = first.getDay() === 0 ? 6 : first.getDay() - 1;
       const gridStart = new Date(first);
       gridStart.setDate(first.getDate() - startOffset);
-      const monthRecords = state.records.filter(record => record.date && record.date.startsWith(yearMonth));
+      const monthRecords = state.records.filter(record => formatDisplayDate(record.date).startsWith(yearMonth));
       const countByDate = monthRecords.reduce((map, record) => {
-        map[record.date] = (map[record.date] || 0) + 1;
+        const dateKey = formatDisplayDate(record.date);
+        map[dateKey] = (map[dateKey] || 0) + 1;
         return map;
       }, {});
 
@@ -2514,6 +2516,29 @@
       }).join("");
 
       els.calendarGrid.innerHTML = weekdays + days;
+    }
+
+    function renderScheduleDayOrders() {
+      if (!els.scheduleDayOrders) return;
+      const selected = els.selectedDate.value || todayISO();
+      const records = state.records
+        .filter(record => formatDisplayDate(record.date) === selected)
+        .sort((a, b) => formatDisplayTime(a.time).localeCompare(formatDisplayTime(b.time)));
+
+      if (!records.length) {
+        els.scheduleDayOrders.innerHTML = `<div class="empty">${escapeHtml(formatDisplayDate(selected))} 暂无预约。</div>`;
+        return;
+      }
+
+      els.scheduleDayOrders.innerHTML = records.map(record => `
+        <div class="mini-row">
+          <span>
+            <strong>${escapeHtml(formatDisplayTime(record.time))} · ${escapeHtml(record.client || "未命名客人")}</strong>
+            <small>${escapeHtml(record.service || "待确认项目")} · ${escapeHtml(statusLabel(record.status))} · ${money.format(finalAmount(record))}</small>
+          </span>
+          <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">编辑</button>
+        </div>
+      `).join("");
     }
 
     function renderClientList() {
@@ -2567,7 +2592,8 @@
     function taskRecords() {
       const today = todayISO();
       return [...state.records]
-        .filter(record => record.date === today || record.status !== "paid" || String(record.notes || "").includes("客户预约/问价"))
+        .filter(record => record.status !== "paid")
+        .filter(record => formatDisplayDate(record.date) === today || String(record.notes || "").includes("客户预约/问价") || record.status === "unpaid" || record.status === "deposit")
         .sort((a, b) => {
           const urgentA = a.status !== "paid" ? 0 : 1;
           const urgentB = b.status !== "paid" ? 0 : 1;
@@ -2842,7 +2868,7 @@
       els.visibleSummary.textContent = `${records.length} 条记录`;
 
       if (!records.length) {
-        els.recordsList.innerHTML = `<div class="empty">这里还没有预约。新增一位客人后，金额、折扣和营业额会自动更新。</div>`;
+        els.recordsList.innerHTML = `<div class="empty">这里没有待处理订单。已收全款的订单会进入营业额统计，不再显示在预约与账单里。</div>`;
         return;
       }
 
@@ -2974,6 +3000,7 @@
       renderAdminTasks();
       renderCloudInbox();
       renderCalendar();
+      renderScheduleDayOrders();
       renderClientList();
       renderServiceList();
       renderList();
@@ -3133,6 +3160,11 @@
       document.querySelector("#date").value = button.dataset.date;
       state.calendarMonth = button.dataset.date.slice(0, 7);
       render();
+    });
+    els.scheduleDayOrders.addEventListener("click", event => {
+      const button = event.target.closest("button[data-action='editSchedule']");
+      if (!button) return;
+      editRecord(button.dataset.id);
     });
     els.quickServices.addEventListener("click", event => {
       const button = event.target.closest("button[data-service]");
