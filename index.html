@@ -1131,11 +1131,15 @@
       const status = String(item.status || "").toLowerCase();
       const source = String(item.source || "").toLowerCase();
       const notes = String(item.notes || "");
+      const hasDepositProof = Boolean(item.paymentProof || item.paymentProofName) || notes.includes("已上传定金截图") || notes.includes("预约自动确认");
       if (!formatDisplayDate(item.date).match(/^\d{4}-\d{2}-\d{2}$/)) return false;
+      if (status === "cancelled" || status === "canceled" || notes.includes("已取消")) return false;
       if (source === "adminblock" || notes.includes("后台预约占位")) {
-        return status !== "cancelled" && status !== "canceled";
+        return true;
       }
-      return status !== "cancelled" && status !== "canceled";
+      if (status === "paid" || status === "deposit") return true;
+      if (status === "unpaid" && source !== "customer") return true;
+      return hasDepositProof;
     }
 
     function mergeAvailabilityData(responses = []) {
