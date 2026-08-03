@@ -510,6 +510,29 @@
       font-weight: 950;
     }
 
+    .rule-check {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+      align-items: start;
+      margin-top: 6px;
+      padding: 10px 12px;
+      border: 1px solid rgba(191, 93, 134, 0.22);
+      border-radius: 14px;
+      background: rgba(255, 240, 246, 0.58);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 850;
+    }
+
+    .rule-check input {
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      accent-color: var(--main);
+    }
+
     .proof-preview {
       display: none;
       width: 100%;
@@ -785,7 +808,7 @@
         </div>
         <div class="notice-card">
           <strong>地址</strong>
-          <p>101 Therry St</p>
+          <p>101 Therry St，到公寓楼下记得按门铃 3409。</p>
         </div>
       </div>
     </section>
@@ -802,7 +825,7 @@
         <div class="grid-2">
           <div>
             <label for="name">姓名</label>
-            <input id="name" type="text" placeholder="怎么称呼你" required>
+            <input id="name" type="text" placeholder="怎么称呼你">
           </div>
           <div>
             <label for="contactPlatform">联系平台</label>
@@ -814,7 +837,7 @@
         </div>
         <div>
           <label for="contact">联系方式</label>
-          <input id="contact" type="text" placeholder="填写小红书号/微信号" required>
+          <input id="contact" type="text" placeholder="填写小红书号/微信号">
         </div>
         <div class="grid-2">
           <div>
@@ -879,6 +902,10 @@
           <label for="notes">款式 / 留言 / 预算</label>
           <textarea id="notes" rows="5" placeholder="可以写想做的颜色、款式、预算，或备注：我会发参考图"></textarea>
         </div>
+        <label class="rule-check" for="policyConfirm">
+          <input id="policyConfirm" type="checkbox">
+          <span>我已阅读预约须知：定金不退，改期需提前 24h 沟通，迟到 30min 默认取消位置。</span>
+        </label>
         <button class="primary" id="copyRequest" type="button">下一步：查看定金账号</button>
         <p class="hint" id="submitHint">选到有空位的日期后，先支付 $10 定金并上传截图，上传后会自动确认预约。</p>
         <div class="deposit-step" id="depositStep">
@@ -1110,8 +1137,11 @@
         "收到此消息表示已预留位置啦",
         "确认预约定金不退，改期需提前24h沟通",
         "地址：101 Therry St",
+        "到公寓楼下记得按门铃 3409 🔔",
         "请提前规划好路线哦 💗",
-        "如迟到30min默认取消位置"
+        "如迟到30min默认取消位置",
+        "",
+        "请截图保存这条预约信息。"
       ].join("\n");
     }
 
@@ -1443,8 +1473,8 @@
     }
 
     function validateBookingPayload(payload) {
-      if (!payload.name || !payload.contact) {
-        alert("请先填写姓名和微信/电话。");
+      if (!payload.name && !payload.contact) {
+        alert("姓名和联系方式至少填一个，方便 Cc Nail 找到你的预约。");
         return false;
       }
       if (!payload.date) {
@@ -1453,6 +1483,10 @@
       }
       if (!payload.time) {
         alert("请先选择 13:00-17:00 之间的预约时间。");
+        return false;
+      }
+      if (!ids("policyConfirm").checked) {
+        alert("请先勾选已阅读预约须知，再继续预约。");
         return false;
       }
       return true;
