@@ -908,8 +908,15 @@
       return status === "paid" || status === "completed" || text.includes("已收全款") || text.includes("订单完成") || text.includes("已完成");
     }
 
+    function isCancelledAppointment(item = {}) {
+      const status = String(item.status || "").toLowerCase();
+      const text = [item.statusText, item.adminNote, item.notes].map(value => String(value || "")).join(" ");
+      return status === "cancelled" || status === "canceled" || text.includes("已取消") || text.includes("已删除");
+    }
+
     function shouldShowCustomerAppointment(item = {}) {
       if (cloudItemBeforeClear(item)) return false;
+      if (isCancelledAppointment(item)) return false;
       return !isPastAppointment(item) && !isFinishedAppointment(item);
     }
 
@@ -1272,7 +1279,7 @@
         if (!shouldShowCustomerAppointment(updated)) {
           localStorage.removeItem(CUSTOMER_APPOINTMENT_KEY);
           renderCustomerAppointment();
-          if (!silent) alert("这个预约已经完成或时间已过，不再显示。");
+          if (!silent) alert(isCancelledAppointment(updated) ? "这个预约已取消，不再显示。" : "这个预约已经完成或时间已过，不再显示。");
           return;
         }
         localStorage.setItem(CUSTOMER_APPOINTMENT_KEY, JSON.stringify(updated));
