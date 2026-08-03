@@ -1775,6 +1775,10 @@
 
     <section class="client-site" id="pricePage" aria-label="客人价目表和预约须知">
       <div class="sheet-section">
+        <h2 class="sheet-title">· 本甲 ·</h2>
+        <div class="price-row"><span>本甲</span><span>$65</span></div>
+      </div>
+      <div class="sheet-section">
         <h2 class="sheet-title">· 延长 ·</h2>
         <div class="price-row"><span>月牙半贴/浅贴（建构+塑形）</span><span>$100</span></div>
         <div class="price-row"><span>甲片二次利用</span><span>$85</span></div>
@@ -1840,7 +1844,7 @@
         <div class="field">
           <label for="quoteExtension">本甲/延长</label>
           <select id="quoteExtension">
-            <option value="55">本甲 $55</option>
+            <option value="65">本甲 $65</option>
             <option value="100">延长（建构+塑形） $100</option>
             <option value="85">二次利用 $85</option>
           </select>
@@ -2232,7 +2236,7 @@
             <label for="service">服务项目</label>
             <div class="quick-services" id="quickServices" aria-label="常用项目快捷选择"></div>
             <select id="service" name="service">
-              <option>本甲 $55</option>
+              <option>本甲 $65</option>
               <option>月牙半贴（建构+塑形）</option>
               <option>浅贴（建构+塑形）</option>
               <option>甲片二次利用</option>
@@ -2307,8 +2311,8 @@
     const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
-      ["本甲 $55", 55],
-      ["本甲", 55],
+      ["本甲 $65", 65],
+      ["本甲", 65],
       ["延长（建构+塑形）", 100],
       ["二次利用", 85],
       ["月牙半贴（建构+塑形）", 100],
@@ -2658,7 +2662,7 @@
       els.bookingForm.reset();
       document.querySelector("#date").value = keepDate ? selected : todayISO();
       document.querySelector("#time").value = APPOINTMENT_DEFAULT_TIME;
-      document.querySelector("#service").value = "本甲 $55";
+      document.querySelector("#service").value = "本甲 $65";
       document.querySelector("#status").value = "paid";
       if (els.styleImage) els.styleImage.value = "";
       setStyleImagePreview("");
@@ -2678,7 +2682,7 @@
       const found = servicePresets.find(([name]) => name === service);
       if (String(service || "").includes("延长") || String(service || "").includes("月牙半贴") || String(service || "").includes("浅贴")) return 100;
       if (String(service || "").includes("二次利用") || String(service || "").includes("甲片二次")) return 85;
-      if (String(service || "") === "本甲") return 55;
+      if (String(service || "") === "本甲") return 65;
       return found ? found[1] : 0;
     }
 
