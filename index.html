@@ -887,6 +887,31 @@
       return `${formatDisplayDate(date)} ${formatDisplayTime(time)}`;
     }
 
+    function appointmentDateTime(item = {}) {
+      const date = formatDisplayDate(item.date);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+      const time = formatDisplayTime(item.time);
+      const safeTime = /^\d{2}:\d{2}$/.test(time) ? time : "23:59";
+      const parsed = new Date(`${date}T${safeTime}:00`);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function isPastAppointment(item = {}) {
+      const appointmentTime = appointmentDateTime(item);
+      if (!appointmentTime) return false;
+      return appointmentTime.getTime() < Date.now();
+    }
+
+    function isFinishedAppointment(item = {}) {
+      const status = String(item.status || "").toLowerCase();
+      const text = [item.statusText, item.adminNote, item.notes].map(value => String(value || "")).join(" ");
+      return status === "paid" || status === "completed" || text.includes("已收全款") || text.includes("订单完成") || text.includes("已完成");
+    }
+
+    function shouldShowCustomerAppointment(item = {}) {
+      return !isPastAppointment(item) && !isFinishedAppointment(item);
+    }
+
     function calendarMonthDate(yearMonth, day = 1) {
       return new Date(`${yearMonth}-${String(day).padStart(2, "0")}T00:00:00`);
     }
@@ -1034,6 +1059,12 @@
         return;
       }
       const item = normalizeAppointmentPayload(JSON.parse(saved));
+      if (!shouldShowCustomerAppointment(item)) {
+        localStorage.removeItem(CUSTOMER_APPOINTMENT_KEY);
+        box.classList.remove("is-visible");
+        box.innerHTML = "";
+        return;
+      }
       box.classList.add("is-visible");
       box.innerHTML = `
         <h3>我的预约信息</h3>
@@ -1234,7 +1265,14 @@
           if (!silent) alert("暂时还没有查到 Cc Nail 的确认更新。");
           return;
         }
-        localStorage.setItem(CUSTOMER_APPOINTMENT_KEY, JSON.stringify(normalizeAppointmentPayload({ ...saved, ...matches[0] })));
+        const updated = normalizeAppointmentPayload({ ...saved, ...matches[0] });
+        if (!shouldShowCustomerAppointment(updated)) {
+          localStorage.removeItem(CUSTOMER_APPOINTMENT_KEY);
+          renderCustomerAppointment();
+          if (!silent) alert("这个预约已经完成或时间已过，不再显示。");
+          return;
+        }
+        localStorage.setItem(CUSTOMER_APPOINTMENT_KEY, JSON.stringify(updated));
         renderCustomerAppointment();
         if (!silent) alert("预约状态已刷新。");
       } catch {
