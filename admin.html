@@ -2309,6 +2309,9 @@
     const CLOUD_BLOCK_SYNC_VERSION = "v25";
     const CLOUD_CLEAR_BEFORE = "2026-08-03T12:00:00.000Z";
     const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+    const CLOUD_SYNC_CACHE_MS = 90 * 1000;
+    let lastCloudFetchAt = 0;
+    let lastCloudFetchData = null;
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $65", 65],
@@ -3434,6 +3437,26 @@
       });
     }
 
+    async function fetchCloudData(force = false) {
+      if (!force && lastCloudFetchData && Date.now() - lastCloudFetchAt < CLOUD_SYNC_CACHE_MS) {
+        return lastCloudFetchData;
+      }
+      const data = await jsonp(GOOGLE_SCRIPT_URL);
+      lastCloudFetchData = data;
+      lastCloudFetchAt = Date.now();
+      return data;
+    }
+
+    function applyCloudData(data) {
+      state.cloudInquiries = Array.isArray(data.items) ? data.items : [];
+      const changed = mergeCloudRecords(state.cloudInquiries);
+      localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
+      if (changed) render();
+      renderCloudInbox();
+      notifyNewCloudBookings();
+      return changed;
+    }
+
     function customerStatusText(record) {
       if (record.status === "paid") return "已确认，已收全款";
       if (record.status === "deposit") return "已确认，已收定金";
@@ -3607,13 +3630,8 @@
       els.refreshCloudInbox.disabled = true;
       els.refreshCloudInbox.textContent = "同步中...";
       try {
-        const data = await jsonp(GOOGLE_SCRIPT_URL);
-        state.cloudInquiries = Array.isArray(data.items) ? data.items : [];
-        const changed = mergeCloudRecords(state.cloudInquiries);
-        localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
-        if (changed) render();
-        renderCloudInbox();
-        notifyNewCloudBookings();
+        const data = await fetchCloudData(true);
+        applyCloudData(data);
       } catch {
         alert("同步失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
       } finally {
@@ -3630,13 +3648,8 @@
         els.refreshCloudInbox.textContent = "同步中...";
       }
       try {
-        const data = await jsonp(GOOGLE_SCRIPT_URL);
-        state.cloudInquiries = Array.isArray(data.items) ? data.items : [];
-        const changed = mergeCloudRecords(state.cloudInquiries);
-        localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
-        if (changed) render();
-        renderCloudInbox();
-        notifyNewCloudBookings();
+        const data = await fetchCloudData(!silent);
+        applyCloudData(data);
       } catch {
         if (!silent) alert("同步失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
       } finally {
