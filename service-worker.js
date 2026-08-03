@@ -1,4 +1,4 @@
-const CACHE_NAME = "cc-nail-github-pages-v41";
+const CACHE_NAME = "cc-nail-github-pages-v42";
 const APP_ASSETS = [
   "./",
   "./index.html",
