@@ -700,6 +700,10 @@
       order: 2;
     }
 
+    .booking-layout {
+      grid-template-columns: 1fr;
+    }
+
     .notice-layout {
       display: grid;
       grid-template-columns: 380px minmax(0, 1fr);
@@ -811,6 +815,18 @@
       line-height: 1.55;
       font-weight: 760;
       white-space: pre-wrap;
+    }
+
+    .task-total-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .task-total-line .meta-pill {
+      min-height: 28px;
+      font-size: 12px;
     }
 
     .booking-info-card {
@@ -999,6 +1015,41 @@
       display: grid;
       gap: 8px;
       min-width: 96px;
+    }
+
+    .schedule-detail-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fffafd;
+    }
+
+    .schedule-detail-card.conflict {
+      border-color: #d94d86;
+      background: #fff0f6;
+    }
+
+    .schedule-detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .schedule-detail-head strong {
+      display: block;
+      color: var(--ink);
+      font-size: 16px;
+    }
+
+    .schedule-detail-head small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     .quick-services {
@@ -1248,13 +1299,20 @@
 
     .record {
       display: grid;
-      grid-template-columns: 72px minmax(0, 1fr) 140px 116px 92px;
+      grid-template-columns: minmax(0, 1fr) 128px 112px;
       gap: 12px;
-      align-items: center;
+      align-items: start;
       padding: 14px;
       border: 1px solid var(--line);
       border-radius: 16px;
       background: #fffafd;
+    }
+
+    .record-top {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
     }
 
     .record-main {
@@ -1270,11 +1328,12 @@
     }
 
     .record-note {
-      max-height: 54px;
+      max-height: 82px;
       overflow: auto;
       padding: 8px 10px;
       border-radius: 12px;
       background: rgba(255, 240, 246, 0.62);
+      white-space: pre-wrap;
     }
 
     .time {
@@ -1354,6 +1413,11 @@
       max-width: none;
     }
 
+    .record-images {
+      display: grid;
+      gap: 8px;
+    }
+
     .money {
       text-align: right;
     }
@@ -1389,6 +1453,7 @@
     .record-actions {
       display: grid;
       gap: 8px;
+      align-self: stretch;
     }
 
     .tiny {
@@ -1896,7 +1961,6 @@
           <a class="side-link" data-icon="📅" data-page="scheduleBoard" href="#scheduleBoard">日程</a>
           <a class="side-link" data-icon="💰" data-page="incomeBoard" href="#incomeBoard">收入管理</a>
           <a class="side-link" data-icon="📊" data-page="statsBoard" href="#statsBoard">统计</a>
-          <a class="side-link" data-icon="⚙" data-page="adminSettings" href="#adminSettings">设置</a>
         </aside>
 
         <div class="admin-main" data-page="adminHome">
@@ -2097,8 +2161,32 @@
       </section>
     </section>
 
-    <section class="layout" id="bookingManagement" data-admin-page="bookingManagement">
-      <section class="panel" aria-label="新增预约">
+    <section class="layout booking-layout" id="bookingManagement" data-admin-page="bookingManagement">
+      <section class="panel booking-list-panel" aria-label="预约列表">
+        <div class="panel-head">
+          <h2>预约与账单</h2>
+          <span class="status" id="visibleSummary">0 条记录</span>
+        </div>
+        <div class="filters">
+          <input id="search" type="search" placeholder="搜索客人、电话、项目">
+          <select id="statusFilter">
+            <option value="all">待处理订单</option>
+            <option value="today">今日到店</option>
+            <option value="future">未来预约</option>
+            <option value="unpaid">未收定金</option>
+            <option value="deposit">已收定金</option>
+            <option value="paid">已完成</option>
+          </select>
+          <select id="sortBy">
+            <option value="timeAsc">时间从早到晚</option>
+            <option value="timeDesc">时间从晚到早</option>
+            <option value="moneyDesc">金额从高到低</option>
+          </select>
+        </div>
+        <div class="list" id="recordsList"></div>
+      </section>
+
+      <section class="panel booking-form-panel" aria-label="新增预约">
         <div class="panel-head">
           <h2 id="formTitle">新增预约</h2>
           <span class="status paid" id="calculatedTotal">实收 ¥0</span>
@@ -2183,27 +2271,6 @@
           </div>
           <p class="hint">营业额按“原价 × 几折 + 另加费用”计算；不填折扣或填 10 代表原价。未付款预约会保留在列表中，但不计入已收营业额。</p>
         </form>
-      </section>
-
-      <section class="panel" aria-label="预约列表">
-        <div class="panel-head">
-          <h2>预约与账单</h2>
-          <span class="status" id="visibleSummary">0 条记录</span>
-        </div>
-        <div class="filters">
-          <input id="search" type="search" placeholder="搜索客人、电话、项目">
-          <select id="statusFilter">
-            <option value="all">待处理订单</option>
-            <option value="unpaid">未付款</option>
-            <option value="deposit">已付定金</option>
-          </select>
-          <select id="sortBy">
-            <option value="timeAsc">时间从早到晚</option>
-            <option value="timeDesc">时间从晚到早</option>
-            <option value="moneyDesc">金额从高到低</option>
-          </select>
-        </div>
-        <div class="list" id="recordsList"></div>
       </section>
     </section>
         </div>
@@ -2604,9 +2671,18 @@
     function visibleRecords() {
       const query = els.search.value.trim().toLowerCase();
       const status = els.statusFilter.value;
-      let records = state.records.filter(record => record.status !== "paid");
+      const today = todayISO();
+      let records = [...state.records];
 
-      if (status !== "all") {
+      if (status === "all") {
+        records = records.filter(record => record.status !== "paid");
+      } else if (status === "today") {
+        records = records.filter(record => formatDisplayDate(record.date) === today && record.status !== "paid");
+      } else if (status === "future") {
+        records = records.filter(record => formatDisplayDate(record.date) >= today && record.status !== "paid");
+      } else if (status === "paid") {
+        records = records.filter(record => record.status === "paid");
+      } else {
         records = records.filter(record => record.status === status);
       }
 
@@ -2867,11 +2943,21 @@
 
       const hasConflict = records.length > 1;
       els.scheduleDayOrders.innerHTML = records.map(record => `
-        <div class="mini-row ${hasConflict ? "conflict" : ""}">
-          <span>
-            <strong>${escapeHtml(formatDisplayTime(record.time))} · ${escapeHtml(record.client || "未命名客人")}</strong>
-            <small>${hasConflict ? "同日多单 · " : ""}${escapeHtml(record.service || "待确认项目")} · ${escapeHtml(statusLabel(record.status))} · 总价 ${money.format(finalAmount(record))} · 待收 ${money.format(outstandingAmount(record))}</small>
-          </span>
+        <div class="schedule-detail-card ${hasConflict ? "conflict" : ""}">
+          <div class="schedule-detail-head">
+            <span>
+              <strong>${escapeHtml(formatDisplayTime(record.time))} · ${escapeHtml(record.client || "未命名客人")}</strong>
+              <small>${escapeHtml(record.phone || "未留联系方式")}</small>
+            </span>
+            <span class="task-badge">${hasConflict ? "同日多单" : escapeHtml(statusLabel(record.status))}</span>
+          </div>
+          <div class="task-detail-grid">
+            ${detailCell("预约时间", `${formatDisplayDate(record.date)} ${formatDisplayTime(record.time)}`)}
+            ${detailCell("项目", record.service || "待确认项目")}
+            ${detailCell("金额", `${money.format(finalAmount(record))} · 已收 ${money.format(paidAmount(record))}`)}
+            ${detailCell("待收", money.format(outstandingAmount(record)))}
+          </div>
+          ${taskNote(record.notes)}
           <span class="mini-actions">
             <button class="tiny" type="button" data-action="reschedule" data-id="${escapeHtml(record.id)}">改期</button>
             <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">编辑全部</button>
@@ -2934,11 +3020,10 @@
     function taskRecords() {
       const today = todayISO();
       return [...state.records]
-        .filter(record => record.status !== "paid")
         .filter(record => formatDisplayDate(record.date) === today)
         .sort((a, b) => {
-          const urgentA = a.status !== "paid" ? 0 : 1;
-          const urgentB = b.status !== "paid" ? 0 : 1;
+          const urgentA = a.status === "unpaid" ? 0 : a.status === "deposit" ? 1 : 2;
+          const urgentB = b.status === "unpaid" ? 0 : b.status === "deposit" ? 1 : 2;
           if (urgentA !== urgentB) return urgentA - urgentB;
           return `${formatDisplayDate(a.date)} ${formatDisplayTime(a.time)}`.localeCompare(`${formatDisplayDate(b.date)} ${formatDisplayTime(b.time)}`);
         })
@@ -2949,6 +3034,7 @@
       if (String(record.notes || "").includes("客户预约/问价")) return "客户问价待确认";
       if (record.status === "unpaid") return "待收定金/确认档期";
       if (record.status === "deposit") return "已收定金，待收尾款";
+      if (record.status === "paid") return "今日已完成";
       if (formatDisplayDate(record.date) === todayISO()) return "今日预约";
       return "待跟进";
     }
@@ -3079,9 +3165,12 @@
     }
 
     function isNewerThanCloud(localRecord, cloudItem) {
+      if (!localRecord) return false;
       const localTime = Date.parse(localRecord?.updatedAt || "");
       const cloudTime = Date.parse(cloudItem?.updatedAt || "");
-      return Number.isFinite(localTime) && Number.isFinite(cloudTime) && localTime > cloudTime + 5000;
+      if (!Number.isFinite(localTime)) return false;
+      if (!Number.isFinite(cloudTime)) return true;
+      return localTime > cloudTime + 1000;
     }
 
     function mergeCloudRecords(items = []) {
@@ -3116,7 +3205,8 @@
           return;
         }
 
-        const merged = isNewerThanCloud(existing, item) ? { ...existing, cloudId: key } : cloudItemToRecord(item, existing);
+        const keepLocal = isNewerThanCloud(existing, item);
+        const merged = keepLocal ? { ...existing, cloudId: key } : cloudItemToRecord(item, existing);
         const index = next.findIndex(record => record.id === merged.id || (record.cloudId && record.cloudId === key));
         if (index >= 0) {
           if (JSON.stringify(next[index]) !== JSON.stringify(merged)) {
@@ -3128,6 +3218,7 @@
           changed = true;
         }
         byCloudId.set(key, merged);
+        if (keepLocal) syncCloudRecord(merged);
       });
 
       if (changed) {
@@ -3490,7 +3581,7 @@
         const extraFeeText = extraFee > 0 ? ` · 另加 ${money.format(extraFee)}` : "";
         const phoneText = record.phone ? ` · ${escapeHtml(record.phone)}` : "";
         const notes = record.notes ? `<p class="record-note">${escapeHtml(record.notes)}</p>` : "";
-        const styleImage = record.styleImage ? `<img class="style-thumb" src="${record.styleImage}" alt="款式图片">` : "";
+        const styleImage = record.styleImage ? `<div class="record-images"><div class="thumb-card"><img class="style-thumb" src="${record.styleImage}" alt="款式图片"><span>款式/截图</span></div></div>` : "";
         const payment = paymentState(record);
         const riskNotes = recordRiskNotes(record);
         const meta = [
@@ -3501,12 +3592,19 @@
         ].join("");
         return `
           <article class="record">
-            <div class="time">${escapeHtml(formatDisplayDate(record.date).slice(5))}<br>${escapeHtml(formatDisplayTime(record.time))}</div>
-            <div class="record-main">
-              <h3>${escapeHtml(record.client)}${phoneText}</h3>
-              <p class="record-line">${escapeHtml(record.service)} · 原价 ${money.format(record.price)} · ${discountText}${extraFeeText}</p>
-              <div class="record-meta">${meta}</div>
-              ${notes}
+            <div class="record-top">
+              <div class="time">${escapeHtml(formatDisplayDate(record.date).slice(5))}<br>${escapeHtml(formatDisplayTime(record.time))}</div>
+              <div class="record-main">
+                <h3>${escapeHtml(record.client || "未命名客人")}${phoneText}</h3>
+                <div class="task-detail-grid">
+                  ${detailCell("预约时间", `${formatDisplayDate(record.date)} ${formatDisplayTime(record.time)}`)}
+                  ${detailCell("联系方式", record.phone || "未留联系方式")}
+                  ${detailCell("项目", record.service || "待确认项目")}
+                  ${detailCell("价格", `原价 ${money.format(record.price)} · ${discountText}${extraFeeText}`)}
+                </div>
+                <div class="record-meta">${meta}</div>
+                ${notes}
+              </div>
             </div>
             ${styleImage}
             <div class="money">
