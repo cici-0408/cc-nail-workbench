@@ -599,6 +599,17 @@
       font-weight: 950;
     }
 
+    .appointment-row.address {
+      border-color: rgba(191, 93, 134, 0.36);
+      background: linear-gradient(135deg, #ffe4f0, #fff6fb);
+      box-shadow: 0 8px 18px rgba(191, 93, 134, 0.12);
+    }
+
+    .appointment-row.address span,
+    .appointment-row.address b {
+      color: var(--main);
+    }
+
     .appointment-card .status {
       display: inline-flex;
       margin-top: 8px;
@@ -941,6 +952,9 @@
     const APPOINTMENT_TIME_LABEL = "13:00-17:00";
     const CLOUD_CLEAR_BEFORE = "2026-08-03T12:00:00.000Z";
     const availabilityCache = new Map();
+    let availabilityDataCache = null;
+    let availabilityDataCheckedAt = 0;
+    const AVAILABILITY_DATA_CACHE_MS = 90 * 1000;
     const customerCalendar = {
       month: "",
       bookedDates: new Set(),
@@ -1017,7 +1031,12 @@
     function isFinishedAppointment(item = {}) {
       const status = String(item.status || "").toLowerCase();
       const text = [item.statusText, item.adminNote, item.notes].map(value => String(value || "")).join(" ");
-      return status === "paid" || status === "completed" || text.includes("已收全款") || text.includes("订单完成") || text.includes("已完成");
+      return ["paid", "completed", "complete", "finished", "done", "closed"].includes(status)
+        || text.includes("已收全款")
+        || text.includes("订单完成")
+        || text.includes("已完成")
+        || text.includes("美甲已完成")
+        || text.includes("已结清");
     }
 
     function isCancelledAppointment(item = {}) {
@@ -1217,10 +1236,10 @@
           ${appointmentRow("预约时间", `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)}`)}
           ${appointmentRow("姓名 / 联系方式", `${item.name || "未填写"} · ${item.contact || "未填写"}`)}
           ${appointmentRow("项目", item.service || "待确认")}
-          ${appointmentRow("到店地址", "101 Therry St · 到公寓楼下记得按门铃 3409 🔔")}
           ${appointmentRow("卸甲", item.removalNeed || "未填写")}
           ${appointmentRow(item.finalTotal ? "最终价格" : "预估总价", `${item.finalTotal || item.quoteTotal || "待确认"} · 定金 ${item.depositReceived || item.quoteDeposit || "$10"} · 尾款 ${item.finalBalance || item.quoteBalance || "待确认"}`)}
           ${appointmentRow("留言", item.styleNotes || item.notes || "无")}
+          ${appointmentRow("到店地址", "101 Therry St · 到公寓楼下记得按门铃 3409 🔔", "address")}
         </div>
         ${item.paymentProof ? `<p>付款截图：已上传</p>` : ""}
         ${item.adminNote ? `<p>确认备注：${escapeHtml(item.adminNote)}</p>` : ""}
@@ -1230,8 +1249,8 @@
       `;
     }
 
-    function appointmentRow(label, value) {
-      return `<div class="appointment-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value || "待确认")}</b></div>`;
+    function appointmentRow(label, value, className = "") {
+      return `<div class="appointment-row ${escapeHtml(className)}"><span>${escapeHtml(label)}</span><b>${escapeHtml(value || "待确认")}</b></div>`;
     }
 
     function changeAppointment() {
@@ -1295,6 +1314,10 @@
       return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
     }
 
+    function sameName(a = "", b = "") {
+      return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+    }
+
     function setSlotStatus(message, state = "") {
       const box = ids("slotStatus");
       box.textContent = message;
@@ -1341,7 +1364,10 @@
       return { items: Array.from(map.values()), bookedDates: Array.from(bookedDates) };
     }
 
-    async function loadAvailabilityItems(attempts = 2) {
+    async function loadAvailabilityItems(attempts = 2, force = false) {
+      if (!force && availabilityDataCache && Date.now() - availabilityDataCheckedAt < AVAILABILITY_DATA_CACHE_MS) {
+        return availabilityDataCache;
+      }
       let lastError = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
@@ -1351,7 +1377,11 @@
             jsonp(`${GOOGLE_SCRIPT_URL}?all=1&check=${stamp}`)
           ]);
           const fulfilled = results.filter(result => result.status === "fulfilled").map(result => result.value);
-          if (fulfilled.length) return mergeAvailabilityData(fulfilled);
+          if (fulfilled.length) {
+            availabilityDataCache = mergeAvailabilityData(fulfilled);
+            availabilityDataCheckedAt = Date.now();
+            return availabilityDataCache;
+          }
           throw results.find(result => result.status === "rejected")?.reason || new Error("availability check failed");
         } catch (error) {
           lastError = error;
@@ -1374,6 +1404,14 @@
         renderCustomerCalendar();
         return cached.available;
       }
+      if (customerCalendar.loaded && !options.force) {
+        const available = !customerCalendar.bookedDates.has(formatDisplayDate(date));
+        availabilityCache.set(date, { available, checkedAt: Date.now() });
+        setSlotStatus(available ? `你选择：${selectedDateTimeLabel(date)}。这天可约，可以继续支付定金。` : `${formatDisplayDate(date)} 这天没空位，请换一天。`, available ? "open" : "full");
+        setBookingAvailableState(available);
+        renderCustomerCalendar();
+        return available;
+      }
       if (!GOOGLE_SCRIPT_URL) {
         setSlotStatus(`你选择：${selectedDateTimeLabel(date)}。暂时无法自动查空位，请联系 Cc Nail 确认。`);
         setBookingAvailableState(true);
@@ -1382,7 +1420,7 @@
       setSlotStatus(`正在确认 ${selectedDateTimeLabel(date)} 有没有空位...`);
       setBookingAvailableState(null);
       try {
-        const availability = await loadAvailabilityItems(2);
+        const availability = await loadAvailabilityItems(2, Boolean(options.force));
         updateBookedDatesFromAvailability(availability);
         const items = availability.items || [];
         const takenByItem = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
@@ -1403,12 +1441,26 @@
       const savedText = localStorage.getItem(CUSTOMER_APPOINTMENT_KEY);
       if (!savedText || !GOOGLE_SCRIPT_URL) return;
       const saved = JSON.parse(savedText);
-      if (!saved.contact) return;
+      const button = ids("refreshAppointmentStatus");
+      const originalText = button?.textContent || "刷新预约状态";
+      if (button && !silent) {
+        button.disabled = true;
+        button.textContent = "正在刷新...";
+      }
       try {
-        const data = await jsonp(`${GOOGLE_SCRIPT_URL}?contact=${encodeURIComponent(saved.contact)}`);
+        const responses = [];
+        if (saved.contact) responses.push(await jsonp(`${GOOGLE_SCRIPT_URL}?contact=${encodeURIComponent(saved.contact)}`));
+        responses.push(await loadAvailabilityItems(1));
+        const data = mergeAvailabilityData(responses);
         const items = Array.isArray(data.items) ? data.items : [];
         const matches = items
-          .filter(item => sameContact(item.contact, saved.contact))
+          .filter(item => {
+            const contactMatched = saved.contact && item.contact && sameContact(item.contact, saved.contact);
+            const nameMatched = saved.name && item.name && sameName(item.name, saved.name);
+            const dateMatched = !saved.date || !item.date || formatDisplayDate(item.date) === formatDisplayDate(saved.date);
+            const timeMatched = !saved.time || !item.time || formatDisplayTime(item.time) === formatDisplayTime(saved.time);
+            return dateMatched && (contactMatched || nameMatched || timeMatched);
+          })
           .filter(item => !saved.date || !item.date || formatDisplayDate(item.date) === formatDisplayDate(saved.date))
           .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
         if (!matches.length) {
@@ -1427,6 +1479,11 @@
         if (!silent) alert("预约状态已刷新。");
       } catch {
         if (!silent) alert("刷新失败，稍后再试一下。");
+      } finally {
+        if (button && !silent) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
       }
     }
 
