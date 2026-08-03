@@ -1899,7 +1899,7 @@
         </div>
         <div class="notice-rule">
           <strong>地址</strong>
-          <p>101 Therry St</p>
+          <p>101 Therry St，到公寓楼下记得按门铃 3409。</p>
         </div>
       </div>
     </section>
@@ -2435,6 +2435,13 @@
       return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
     }
 
+    function addDaysISO(dateText, days) {
+      const base = new Date(`${dateText || todayISO()}T00:00:00`);
+      base.setDate(base.getDate() + days);
+      const offset = base.getTimezoneOffset();
+      return new Date(base.getTime() - offset * 60000).toISOString().slice(0, 10);
+    }
+
     function toNumber(value) {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
@@ -2475,7 +2482,7 @@
       return {
         shopName: "我的美甲预约须知",
         shopContact: "请通过微信/电话联系预约，并发送想做的款式参考图。",
-        shopAddress: "101 Therry St",
+        shopAddress: "101 Therry St，到公寓楼下记得按门铃 3409。",
         depositRule: "预约需支付定金后保留档期，定金可抵扣当天消费。临时爽约或未按规则取消，定金不退。",
         cancelRule: "如需改期或取消，请至少提前一天联系。迟到超过15分钟可能需要调整款式或重新预约。",
         careRule: "到店前可提前想好颜色和款式。手部有伤口、过敏、甲沟不适请提前说明。完成后24小时内尽量避免长时间泡水。"
@@ -2486,7 +2493,7 @@
       return {
         shopName: els.shopName.value.trim() || "我的美甲预约须知",
         shopContact: els.shopContact.value.trim() || "请通过微信/电话联系预约，并发送想做的款式参考图。",
-        shopAddress: els.shopAddress.value.trim() || "101 Therry St",
+        shopAddress: els.shopAddress.value.trim() || "101 Therry St，到公寓楼下记得按门铃 3409。",
         depositRule: els.depositRule.value.trim(),
         cancelRule: els.cancelRule.value.trim(),
         careRule: els.careRule.value.trim()
@@ -2503,7 +2510,7 @@
         notice = { ...notice, ...JSON.parse(localStorage.getItem(NOTICE_KEY) || "{}") };
       } catch {}
       if (notice.shopAddress === "预约确认后发送详细地址。") {
-        notice.shopAddress = "101 Therry St";
+        notice.shopAddress = "101 Therry St，到公寓楼下记得按门铃 3409。";
       }
 
       els.shopName.value = notice.shopName;
@@ -2857,7 +2864,9 @@
     function renderSmartInsights() {
       if (!els.smartInsights) return;
       const today = todayISO();
+      const tomorrow = addDaysISO(today, 1);
       const todayRecords = recordsForDate(today).sort((a, b) => formatDisplayTime(a.time).localeCompare(formatDisplayTime(b.time)));
+      const tomorrowRecords = recordsForDate(tomorrow).sort((a, b) => formatDisplayTime(a.time).localeCompare(formatDisplayTime(b.time)));
       const unpaidRecords = activeRecords().filter(record => record.status === "unpaid");
       const depositRecords = activeRecords().filter(record => record.status === "deposit" && outstandingAmount(record) > 0);
       const upcoming = activeRecords()
@@ -2878,6 +2887,13 @@
           todayRecords.length ? "今日待办只显示今天到店客人。" : "今天暂时空着，可以安排新预约。",
           todayRecords.slice(0, 3).map(record => `${formatDisplayTime(record.time)} ${record.client || "未命名"} · ${record.service || "待确认"}`),
           todayRecords.length ? "alert" : "good"
+        ),
+        smartCard(
+          "明天提醒",
+          tomorrowRecords.length ? `${tomorrowRecords.length} 位` : "无预约",
+          tomorrowRecords.length ? "可以提前确认路线、款式图和定金状态。" : "明天暂时没有客人。",
+          tomorrowRecords.slice(0, 3).map(record => `${formatDisplayTime(record.time)} ${record.client || "未命名"} · ${record.service || "待确认"}`),
+          tomorrowRecords.length ? "alert" : "good"
         ),
         smartCard(
           "未收定金",
@@ -2913,7 +2929,7 @@
           repeatClients.slice(0, 3).map(([name, count]) => `${name} · ${count} 次`)
         )
       ];
-      const warningCount = unpaidRecords.length + depositRecords.length + conflicts.length;
+      const warningCount = tomorrowRecords.length + unpaidRecords.length + depositRecords.length + conflicts.length;
       els.smartSummary.textContent = warningCount ? `${warningCount} 个提醒` : "状态很好";
       els.smartInsights.innerHTML = cards.join("");
     }
@@ -3110,6 +3126,7 @@
             </div>
             <div class="task-actions">
               <button class="tiny" type="button" data-action="copyMessage" data-id="${record.id}">复制通知</button>
+              <button class="tiny" type="button" data-action="copyPayConfirm" data-id="${record.id}">复制收款+确认</button>
               <button class="tiny" type="button" data-action="markDeposit" data-id="${record.id}">收定金</button>
               <button class="tiny" type="button" data-action="markPaid" data-id="${record.id}">收全款</button>
             </div>
@@ -3724,6 +3741,7 @@
             </div>
             <div class="record-actions">
               <button class="tiny" type="button" data-action="copyMessage" data-id="${record.id}">${escapeHtml(smartMessageButtonLabel(record))}</button>
+              <button class="tiny" type="button" data-action="copyPayConfirm" data-id="${record.id}">复制收款+确认</button>
               <button class="tiny" type="button" data-action="edit" data-id="${record.id}">改期/编辑</button>
               <button class="tiny" type="button" data-action="markDeposit" data-id="${record.id}">收定金</button>
               <button class="tiny" type="button" data-action="togglePaid" data-id="${record.id}">${record.status === "paid" ? "设为未付" : "设为已付"}</button>
@@ -3797,6 +3815,8 @@
         "",
         "收到此消息表示已预留位置啦",
         "确认预约定金不退，改期需提前24h沟通",
+        "地址：101 Therry St",
+        "到公寓楼下记得按门铃 3409 🔔",
         "请提前规划好路线哦 💗",
         "如迟到30min默认取消位置"
       ].join("\n");
@@ -3816,6 +3836,27 @@
         "付款后请截图发我确认档期 💗"
       ].join("\n");
     }
+
+    function paymentAndConfirmMessage(record) {
+      return [
+        "预约信息 + 定金账号：",
+        `${formatDisplayDate(record.date)} ${formatDisplayTime(record.time)} 到店`,
+        `项目：${record.service || "待确认"}`,
+        "",
+        "预约定金：$10",
+        "NAME: ZHU Q",
+        "BSB: 013132",
+        "ACCOUNT: 436090844",
+        "",
+        "收到此消息表示已预留位置啦",
+        "确认预约定金不退，改期需提前24h沟通",
+        "地址：101 Therry St",
+        "到公寓楼下记得按门铃 3409 🔔",
+        "请提前规划好路线哦 💗",
+        "如迟到30min默认取消位置"
+      ].join("\n");
+    }
+
 
     function aftercareMessage(record) {
       return [
@@ -4205,6 +4246,10 @@
         const record = state.records.find(item => item.id === id);
         if (record) copyText(smartMessage(record), smartMessageSuccess(record));
       }
+      if (action === "copyPayConfirm") {
+        const record = state.records.find(item => item.id === id);
+        if (record) copyText(paymentAndConfirmMessage(record), "收款账号和确认预约信息已复制。");
+      }
       if (action === "markDeposit") markDeposit(id);
       if (action === "markPaid") markPaid(id);
       if (action === "togglePaid") togglePaid(id);
@@ -4216,6 +4261,7 @@
       const { action, id } = button.dataset;
       const record = state.records.find(item => item.id === id);
       if (action === "copyMessage" && record) copyText(smartMessage(record), smartMessageSuccess(record));
+      if (action === "copyPayConfirm" && record) copyText(paymentAndConfirmMessage(record), "收款账号和确认预约信息已复制。");
       if (action === "markDeposit") markDeposit(id);
       if (action === "markPaid") markPaid(id);
     });
