@@ -801,9 +801,16 @@
             <input id="name" type="text" placeholder="怎么称呼你" required>
           </div>
           <div>
-            <label for="contact">微信/电话</label>
-            <input id="contact" type="text" placeholder="方便联系确认" required>
+            <label for="contactPlatform">联系平台</label>
+            <select id="contactPlatform">
+              <option>小红书</option>
+              <option>微信</option>
+            </select>
           </div>
+        </div>
+        <div>
+          <label for="contact">联系方式</label>
+          <input id="contact" type="text" placeholder="填写小红书号/微信号" required>
         </div>
         <div class="grid-2">
           <div>
@@ -1196,8 +1203,11 @@
       const saved = localStorage.getItem(CUSTOMER_APPOINTMENT_KEY);
       if (!saved) return;
       const item = normalizeAppointmentPayload(JSON.parse(saved));
+      const contactText = String(item.contact || "");
+      const contactParts = contactText.match(/^(小红书|微信)：(.+)$/);
       ids("name").value = item.name || "";
-      ids("contact").value = item.contact || "";
+      ids("contactPlatform").value = item.contactPlatform || contactParts?.[1] || "小红书";
+      ids("contact").value = contactParts?.[2] || item.contact || "";
       ids("date").value = formatDisplayDate(item.date) === "待确认" ? todayISO() : formatDisplayDate(item.date);
       ids("time").value = formatDisplayTime(item.time) === "待确认" ? "13:00" : formatDisplayTime(item.time);
       ids("service").value = item.service || "本甲";
@@ -1386,10 +1396,11 @@
     }
 
     function requestText() {
+      const platform = ids("contactPlatform").value || "小红书";
       return [
         "Cc Nail 预约",
         `姓名：${ids("name").value || "未填写"}`,
-        `微信/电话：${ids("contact").value || "未填写"}`,
+        `联系方式：${platform}：${ids("contact").value || "未填写"}`,
         `想约日期：${formatDisplayDate(ids("date").value) || "未填写"}`,
         `预约时间：${formatDisplayTime(ids("time").value) || "待确认"}`,
         `想做项目：${ids("service").value}`,
@@ -1405,10 +1416,14 @@
     function requestPayload() {
       const removalNeed = ids("removalNeed").value || "";
       const rawNotes = ids("notes").value || "";
+      const contactPlatform = ids("contactPlatform").value || "小红书";
+      const contactValue = ids("contact").value || "";
       const now = new Date().toISOString();
       return {
         name: ids("name").value || "",
-        contact: ids("contact").value || "",
+        contact: contactValue ? `${contactPlatform}：${contactValue}` : "",
+        contactPlatform,
+        contactValue,
         date: ids("date").value || "",
         time: ids("time").value || "",
         service: ids("service").value || "",
