@@ -1217,6 +1217,7 @@
           ${appointmentRow("预约时间", `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)}`)}
           ${appointmentRow("姓名 / 联系方式", `${item.name || "未填写"} · ${item.contact || "未填写"}`)}
           ${appointmentRow("项目", item.service || "待确认")}
+          ${appointmentRow("到店地址", "101 Therry St · 到公寓楼下记得按门铃 3409 🔔")}
           ${appointmentRow("卸甲", item.removalNeed || "未填写")}
           ${appointmentRow(item.finalTotal ? "最终价格" : "预估总价", `${item.finalTotal || item.quoteTotal || "待确认"} · 定金 ${item.depositReceived || item.quoteDeposit || "$10"} · 尾款 ${item.finalBalance || item.quoteBalance || "待确认"}`)}
           ${appointmentRow("留言", item.styleNotes || item.notes || "无")}
