@@ -827,7 +827,6 @@
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const CUSTOMER_APPOINTMENT_KEY = "ccNail.customerAppointment.v1";
     const APPOINTMENT_TIME_LABEL = "13:00-17:00";
-    const FORCE_OPEN_DATES = new Set(["2026-08-05"]);
     const availabilityCache = new Map();
     const customerCalendar = {
       month: "",
@@ -945,7 +944,7 @@
         const iso = localDateISO(date);
         const otherMonth = date.getMonth() !== month;
         const isPast = iso < today;
-        const isFull = customerCalendar.bookedDates.has(iso) && !FORCE_OPEN_DATES.has(iso);
+        const isFull = customerCalendar.bookedDates.has(iso);
         const classes = [
           "calendar-day",
           otherMonth ? "blank" : "",
@@ -971,9 +970,13 @@
 
     function updateBookedDatesFromAvailability(data = {}) {
       const booked = new Set();
+      (data.bookedDates || []).forEach(date => {
+        const normalized = formatDisplayDate(date);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) booked.add(normalized);
+      });
       (data.items || []).forEach(item => {
         const normalized = formatDisplayDate(item.date);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized) && isActiveBooking(item) && !FORCE_OPEN_DATES.has(normalized)) booked.add(normalized);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized) && isActiveBooking(item)) booked.add(normalized);
       });
       customerCalendar.bookedDates = booked;
       customerCalendar.loaded = true;
@@ -1161,16 +1164,11 @@
 
     function isActiveBooking(item) {
       const status = String(item.status || "").toLowerCase();
-      const source = String(item.source || "").toLowerCase();
       const notes = String(item.notes || "");
-      const hasDepositProof = Boolean(item.paymentProof || item.paymentProofName) || notes.includes("已上传定金截图") || notes.includes("预约自动确认");
       if (!formatDisplayDate(item.date).match(/^\d{4}-\d{2}-\d{2}$/)) return false;
       if (status === "cancelled" || status === "canceled" || notes.includes("已取消")) return false;
-      if (source === "adminblock" || notes.includes("后台预约占位")) {
-        return status === "paid" || status === "deposit" || hasDepositProof;
-      }
-      if (status === "paid" || status === "deposit") return true;
-      return hasDepositProof;
+      if (isPastAppointment(item) || isFinishedAppointment(item)) return false;
+      return true;
     }
 
     function mergeAvailabilityData(responses = []) {
@@ -1235,7 +1233,7 @@
         const availability = await loadAvailabilityItems(2);
         updateBookedDatesFromAvailability(availability);
         const items = availability.items || [];
-        const takenByItem = !FORCE_OPEN_DATES.has(formatDisplayDate(date)) && items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
+        const takenByItem = items.some(item => formatDisplayDate(item.date) === date && isActiveBooking(item));
         const taken = takenByItem;
         const available = !taken;
         availabilityCache.set(date, { available, checkedAt: Date.now() });
