@@ -189,6 +189,22 @@
       background: #fff0f6;
     }
 
+    .side-link.has-alert::after {
+      content: attr(data-alert);
+      min-width: 22px;
+      height: 22px;
+      display: inline-grid;
+      place-items: center;
+      margin-left: auto;
+      padding: 0 7px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--pink-600);
+      font-size: 12px;
+      font-weight: 950;
+      box-shadow: 0 8px 18px rgba(191, 93, 134, 0.22);
+    }
+
     .admin-main {
       min-width: 0;
     }
@@ -2283,10 +2299,12 @@
     const PREF_KEY = "personalNailWorkbench.preferences.v1";
     const NOTICE_KEY = "personalNailWorkbench.notice.v1";
     const DISMISSED_CLOUD_KEY = "personalNailWorkbench.dismissedCloud.v1";
+    const NOTIFIED_CLOUD_KEY = "personalNailWorkbench.notifiedCloud.v1";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const APPOINTMENT_DEFAULT_TIME = "13:00";
     const CLOUD_BLOCK_SYNC_VERSION = "v25";
     const CLOUD_CLEAR_BEFORE = "2026-08-03T12:00:00.000Z";
+    const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -2311,16 +2329,21 @@
       calendarMonth: ""
     };
 
-    function loadDismissedCloudKeys() {
+    function loadKeySet(storageKey) {
       try {
-        const saved = JSON.parse(localStorage.getItem(DISMISSED_CLOUD_KEY) || "[]");
+        const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
         return new Set(Array.isArray(saved) ? saved : []);
       } catch {
         return new Set();
       }
     }
 
+    function loadDismissedCloudKeys() {
+      return loadKeySet(DISMISSED_CLOUD_KEY);
+    }
+
     const dismissedCloudKeys = loadDismissedCloudKeys();
+    const notifiedCloudKeys = loadKeySet(NOTIFIED_CLOUD_KEY);
 
     const els = {
       customerTab: document.querySelector("#customerTab"),
@@ -2965,7 +2988,7 @@
             <button class="tiny" type="button" data-action="reschedule" data-id="${escapeHtml(record.id)}">改期</button>
             <button class="tiny" type="button" data-action="editSchedule" data-id="${escapeHtml(record.id)}">编辑全部</button>
             ${hasConflict ? `<button class="tiny" type="button" data-action="keepOnlySchedule" data-id="${escapeHtml(record.id)}">保留这位</button>` : ""}
-            <button class="tiny" type="button" data-action="deleteSchedule" data-id="${escapeHtml(record.id)}">删除</button>
+            <button class="tiny" type="button" data-action="deleteSchedule" data-id="${escapeHtml(record.id)}">取消预约</button>
           </span>
         </div>
       `).join("");
@@ -3242,6 +3265,52 @@
       localStorage.setItem(DISMISSED_CLOUD_KEY, JSON.stringify([...dismissedCloudKeys]));
     }
 
+    function saveNotifiedCloudKeys() {
+      localStorage.setItem(NOTIFIED_CLOUD_KEY, JSON.stringify([...notifiedCloudKeys]));
+    }
+
+    function pendingCloudItems() {
+      const imported = importedCloudKeys();
+      return state.cloudInquiries.filter(item =>
+        !imported.has(cloudKey(item)) &&
+        !dismissedCloudKeys.has(cloudKey(item)) &&
+        !dismissedCloudKeys.has(cloudStableKey(item)) &&
+        !String(item.notes || "").includes("后台预约占位") &&
+        !cloudItemDeleted(item) &&
+        !cloudItemBeforeClear(item)
+      );
+    }
+
+    function updateCloudAlertBadge(pending = pendingCloudItems()) {
+      const count = pending.length;
+      const homeLink = document.querySelector('.side-link[data-page="adminHome"]');
+      if (homeLink) {
+        homeLink.classList.toggle("has-alert", count > 0);
+        if (count > 0) homeLink.dataset.alert = count;
+        else delete homeLink.dataset.alert;
+      }
+      document.title = count > 0 ? `(${count}) Cc Nail 后台工作台` : "Cc Nail 后台工作台";
+      if (els.cloudInboxSummary) {
+        els.cloudInboxSummary.textContent = count > 0 ? `${count} 条待确认 · 有新预约` : "暂无新预约";
+      }
+    }
+
+    function notifyNewCloudBookings(pending = pendingCloudItems()) {
+      const fresh = pending.filter(item => {
+        const key = cloudKey(item);
+        return key && !notifiedCloudKeys.has(key);
+      });
+      if (!fresh.length) return;
+      fresh.forEach(item => notifiedCloudKeys.add(cloudKey(item)));
+      saveNotifiedCloudKeys();
+      const lines = fresh.slice(0, 3).map(item => `${item.name || "新客人"} · ${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)} · ${item.service || "待确认项目"}`);
+      const goInbox = confirm([`有 ${fresh.length} 条新的客户预约`, "", ...lines, "", "要现在去客户提交收件箱查看吗？"].join("\n"));
+      if (goInbox) {
+        showAdminPage("adminHome");
+        document.querySelector('[aria-label="Google 客户提交收件箱"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
     function renderCloudInbox() {
       if (!els.cloudInboxList) return;
       if (!GOOGLE_SCRIPT_URL) {
@@ -3249,9 +3318,8 @@
         els.cloudInboxList.innerHTML = `<div class="empty">先创建 Google 表格接口，再把 Web App 链接填进网站，就能自动收客户提交。</div>`;
         return;
       }
-      const imported = importedCloudKeys();
-      const pending = state.cloudInquiries.filter(item => !imported.has(cloudKey(item)) && !dismissedCloudKeys.has(cloudKey(item)) && !dismissedCloudKeys.has(cloudStableKey(item)) && !String(item.notes || "").includes("后台预约占位"));
-      els.cloudInboxSummary.textContent = `${pending.length} 条待确认`;
+      const pending = pendingCloudItems();
+      updateCloudAlertBadge(pending);
       if (!pending.length) {
         els.cloudInboxList.innerHTML = `<div class="empty">暂无新的客户提交。点“刷新客户提交”检查 Google 表格。</div>`;
         return;
@@ -3283,7 +3351,7 @@
             </div>
             <div class="task-actions">
               <button class="tiny" type="button" data-action="importCloud" data-id="${escapeHtml(key)}">加入账本</button>
-              <button class="tiny" type="button" data-action="deleteCloud" data-id="${escapeHtml(key)}">删除</button>
+              <button class="tiny" type="button" data-action="deleteCloud" data-id="${escapeHtml(key)}">取消提交</button>
             </div>
           </article>
         `;
@@ -3292,7 +3360,7 @@
 
     async function deleteCloudInquiry(id) {
       if (!id) return;
-      if (!confirm("确定从收件箱删除这条客户提交吗？")) return;
+      if (!confirm("确定取消这条客户提交吗？取消后会同步释放客户页日期。")) return;
       const item = state.cloudInquiries.find(entry => cloudKey(entry) === id);
       if (GOOGLE_SCRIPT_URL && item) {
         try {
@@ -3310,8 +3378,8 @@
               service: item.service || "",
               notes: `${item.notes || ""} 已取消`,
               status: "cancelled",
-              statusText: "后台已删除/取消",
-              adminNote: "后台已从客户提交收件箱删除。",
+              statusText: "后台已取消预约",
+              adminNote: "后台已取消这条客户提交。",
               updatedAt: new Date().toISOString()
             })
           });
@@ -3402,8 +3470,8 @@
             service: record.service || "",
             notes: `${record.notes || ""} 已取消`,
             status: "cancelled",
-            statusText: "后台已删除/取消",
-            adminNote: "后台已删除这条预约。",
+            statusText: "后台已取消预约",
+            adminNote: "后台已取消这条预约。",
             updatedAt: new Date().toISOString()
           })
         });
@@ -3524,6 +3592,7 @@
         localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
         if (changed) render();
         renderCloudInbox();
+        notifyNewCloudBookings();
       } catch {
         alert("同步失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
       } finally {
@@ -3546,6 +3615,7 @@
         localStorage.setItem("ccNail.lastCloudSyncAt", new Date().toLocaleString("zh-CN", { hour12: false }));
         if (changed) render();
         renderCloudInbox();
+        notifyNewCloudBookings();
       } catch {
         if (!silent) alert("同步失败。请检查 Google Web App 链接是否正确、权限是否选了 Anyone。");
       } finally {
@@ -3653,7 +3723,7 @@
               <button class="tiny" type="button" data-action="edit" data-id="${record.id}">改期/编辑</button>
               <button class="tiny" type="button" data-action="markDeposit" data-id="${record.id}">收定金</button>
               <button class="tiny" type="button" data-action="togglePaid" data-id="${record.id}">${record.status === "paid" ? "设为未付" : "设为已付"}</button>
-              <button class="tiny" type="button" data-action="delete" data-id="${record.id}">删除</button>
+              <button class="tiny" type="button" data-action="delete" data-id="${record.id}">取消预约</button>
             </div>
           </article>
         `;
@@ -3856,7 +3926,7 @@
       const record = state.records.find(item => item.id === id);
       if (!record) return;
       const ok = confirm([
-        "确定删除并释放这个档期吗？",
+        "确定取消这个预约并释放档期吗？",
         "",
         `客人：${record.client || "未命名客人"}`,
         `时间：${formatDisplayDate(record.date)} ${formatDisplayTime(record.time)}`,
@@ -3881,7 +3951,7 @@
         `确定只保留 ${keeper.client || "这位客人"} 吗？`,
         "",
         `日期：${formatDisplayDate(keeper.date)}`,
-        `将删除同日其他 ${sameDay.length} 条预约，并释放重复档期。`
+        `将取消同日其他 ${sameDay.length} 条预约，并释放重复档期。`
       ].join("\n"));
       if (!ok) return;
       for (const record of sameDay) {
@@ -4169,6 +4239,7 @@
     updateQuote();
     render();
     syncPendingManualBlocks().then(() => syncAllCloudRecords(true));
+    setInterval(() => syncAllCloudRecords(true), AUTO_SYNC_INTERVAL_MS);
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./service-worker.js");
     }
