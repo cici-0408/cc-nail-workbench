@@ -1135,10 +1135,9 @@
       if (!formatDisplayDate(item.date).match(/^\d{4}-\d{2}-\d{2}$/)) return false;
       if (status === "cancelled" || status === "canceled" || notes.includes("已取消")) return false;
       if (source === "adminblock" || notes.includes("后台预约占位")) {
-        return true;
+        return status === "paid" || status === "deposit" || hasDepositProof;
       }
       if (status === "paid" || status === "deposit") return true;
-      if (status === "unpaid" && source !== "customer") return true;
       return hasDepositProof;
     }
 
