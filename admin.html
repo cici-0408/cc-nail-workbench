@@ -2175,7 +2175,7 @@
             <option value="future">未来预约</option>
             <option value="unpaid">未收定金</option>
             <option value="deposit">已收定金</option>
-            <option value="paid">已完成</option>
+            <option value="paid">已完成订单</option>
           </select>
           <select id="sortBy">
             <option value="timeAsc">时间从早到晚</option>
@@ -2438,7 +2438,8 @@
       return {
         ...record,
         date: formatDisplayDate(record.date || todayISO()),
-        time: formatDisplayTime(record.time || APPOINTMENT_DEFAULT_TIME)
+        time: formatDisplayTime(record.time || APPOINTMENT_DEFAULT_TIME),
+        paymentProof: record.paymentProof || ""
       };
     }
 
@@ -2579,6 +2580,7 @@
         status: form.get("status"),
         notes: String(form.get("notes") || "").trim(),
         styleImage: existing?.styleImage || "",
+        paymentProof: existing?.paymentProof || "",
         cloudId: existing?.cloudId || "",
         cloudBlockDate: existing?.cloudBlockDate || "",
         cloudBlockTime: existing?.cloudBlockTime || "",
@@ -3156,7 +3158,8 @@
         deposit,
         status: cloudItemStatus(item),
         notes: notes || existing?.notes || "",
-        styleImage: item.paymentProof || existing?.styleImage || "",
+        styleImage: existing?.styleImage || "",
+        paymentProof: item.paymentProof || existing?.paymentProof || "",
         cloudBlockDate: source === "adminBlock" ? formatDisplayDate(item.date || existing?.cloudBlockDate || "") : existing?.cloudBlockDate || "",
         cloudBlockTime: source === "adminBlock" ? formatDisplayTime(item.time || existing?.cloudBlockTime || "") : existing?.cloudBlockTime || "",
         cloudBlockSyncVersion: source === "adminBlock" ? CLOUD_BLOCK_SYNC_VERSION : existing?.cloudBlockSyncVersion || "",
@@ -3280,10 +3283,33 @@
       }).join("");
     }
 
-    function deleteCloudInquiry(id) {
+    async function deleteCloudInquiry(id) {
       if (!id) return;
       if (!confirm("确定从收件箱删除这条客户提交吗？")) return;
       const item = state.cloudInquiries.find(entry => cloudKey(entry) === id);
+      if (GOOGLE_SCRIPT_URL && item) {
+        try {
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            body: new URLSearchParams({
+              action: "updateStatus",
+              id,
+              source: item.source || "customer",
+              name: item.name || "未命名客人",
+              contact: item.contact || "",
+              date: formatDisplayDate(item.date || ""),
+              time: formatDisplayTime(item.time || APPOINTMENT_DEFAULT_TIME),
+              service: item.service || "",
+              notes: `${item.notes || ""} 已取消`,
+              status: "cancelled",
+              statusText: "后台已删除/取消",
+              adminNote: "后台已从客户提交收件箱删除。",
+              updatedAt: new Date().toISOString()
+            })
+          });
+        } catch {}
+      }
       dismissedCloudKeys.add(id);
       if (item) dismissedCloudKeys.add(cloudStableKey(item));
       saveDismissedCloudKeys();
@@ -3551,7 +3577,8 @@
         deposit: isDepositPaid ? 10 : 0,
         status: isDepositPaid ? "deposit" : "unpaid",
         notes: `Google客户提交：${item.notes || "待确认款式和价格"}${item.quoteTotal ? `｜估算 ${item.quoteTotal}` : ""}${item.paymentProofName ? `｜付款截图 ${item.paymentProofName}` : ""}`,
-        styleImage: item.paymentProof || "",
+        styleImage: "",
+        paymentProof: item.paymentProof || "",
         updatedAt: new Date().toISOString()
       };
       state.records.push(record);
@@ -3581,7 +3608,9 @@
         const extraFeeText = extraFee > 0 ? ` · 另加 ${money.format(extraFee)}` : "";
         const phoneText = record.phone ? ` · ${escapeHtml(record.phone)}` : "";
         const notes = record.notes ? `<p class="record-note">${escapeHtml(record.notes)}</p>` : "";
-        const styleImage = record.styleImage ? `<div class="record-images"><div class="thumb-card"><img class="style-thumb" src="${record.styleImage}" alt="款式图片"><span>款式/截图</span></div></div>` : "";
+        const styleImage = record.styleImage ? `<div class="thumb-card"><img class="style-thumb" src="${record.styleImage}" alt="款式参考图"><span>款式参考图</span></div>` : "";
+        const paymentProof = record.paymentProof ? `<div class="thumb-card"><img class="style-thumb" src="${record.paymentProof}" alt="定金付款截图"><span>定金付款截图</span></div>` : "";
+        const imageBlock = styleImage || paymentProof ? `<div class="record-images">${styleImage}${paymentProof}</div>` : "";
         const payment = paymentState(record);
         const riskNotes = recordRiskNotes(record);
         const meta = [
@@ -3601,12 +3630,13 @@
                   ${detailCell("联系方式", record.phone || "未留联系方式")}
                   ${detailCell("项目", record.service || "待确认项目")}
                   ${detailCell("价格", `原价 ${money.format(record.price)} · ${discountText}${extraFeeText}`)}
+                  ${detailCell("最近修改", formatUpdatedAt(record.updatedAt))}
                 </div>
                 <div class="record-meta">${meta}</div>
                 ${notes}
               </div>
             </div>
-            ${styleImage}
+            ${imageBlock}
             <div class="money">
               <strong>${money.format(actual)}</strong>
               <span>${statusLabel(record.status)} · 已收 ${money.format(paid)}</span>
@@ -3664,6 +3694,18 @@
         return new Date(parsed.getTime() - offset * 60000).toISOString().slice(11, 16);
       }
       return text;
+    }
+
+    function formatUpdatedAt(value) {
+      const parsed = new Date(value || "");
+      if (Number.isNaN(parsed.getTime())) return "未记录";
+      return parsed.toLocaleString("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
     }
 
     function appointmentMessage(record) {
@@ -3918,6 +3960,7 @@
             status: record.status || "unpaid",
             notes: record.notes || "",
             styleImage: record.styleImage || "",
+            paymentProof: record.paymentProof || "",
             cloudId: record.cloudId || "",
             cloudBlockDate: record.cloudBlockDate || "",
             updatedAt: record.updatedAt || new Date().toISOString()
