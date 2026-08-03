@@ -827,6 +827,7 @@
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const CUSTOMER_APPOINTMENT_KEY = "ccNail.customerAppointment.v1";
     const APPOINTMENT_TIME_LABEL = "13:00-17:00";
+    const CLOUD_CLEAR_BEFORE = "2026-08-03T12:00:00.000Z";
     const availabilityCache = new Map();
     const customerCalendar = {
       month: "",
@@ -908,7 +909,14 @@
     }
 
     function shouldShowCustomerAppointment(item = {}) {
+      if (cloudItemBeforeClear(item)) return false;
       return !isPastAppointment(item) && !isFinishedAppointment(item);
+    }
+
+    function cloudItemBeforeClear(item = {}) {
+      const stamp = Date.parse(item.updatedAt || item.createdAt || "");
+      if (!Number.isFinite(stamp)) return true;
+      return stamp < Date.parse(CLOUD_CLEAR_BEFORE);
     }
 
     function calendarMonthDate(yearMonth, day = 1) {
@@ -970,10 +978,6 @@
 
     function updateBookedDatesFromAvailability(data = {}) {
       const booked = new Set();
-      (data.bookedDates || []).forEach(date => {
-        const normalized = formatDisplayDate(date);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) booked.add(normalized);
-      });
       (data.items || []).forEach(item => {
         const normalized = formatDisplayDate(item.date);
         if (/^\d{4}-\d{2}-\d{2}$/.test(normalized) && isActiveBooking(item)) booked.add(normalized);
@@ -1166,6 +1170,7 @@
       const status = String(item.status || "").toLowerCase();
       const notes = String(item.notes || "");
       if (!formatDisplayDate(item.date).match(/^\d{4}-\d{2}-\d{2}$/)) return false;
+      if (cloudItemBeforeClear(item)) return false;
       if (status === "cancelled" || status === "canceled" || notes.includes("已取消")) return false;
       if (isPastAppointment(item) || isFinishedAppointment(item)) return false;
       return true;
@@ -1298,6 +1303,7 @@
     function requestPayload() {
       const removalNeed = ids("removalNeed").value || "";
       const rawNotes = ids("notes").value || "";
+      const now = new Date().toISOString();
       return {
         name: ids("name").value || "",
         contact: ids("contact").value || "",
@@ -1309,7 +1315,9 @@
         notes: `卸甲：${removalNeed}${rawNotes ? `\n${rawNotes}` : ""}`,
         quoteTotal: ids("quoteTotal").textContent,
         quoteDeposit: ids("quoteDeposit").textContent,
-        quoteBalance: ids("quoteBalance").textContent
+        quoteBalance: ids("quoteBalance").textContent,
+        createdAt: now,
+        updatedAt: now
       };
     }
 
