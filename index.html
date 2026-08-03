@@ -322,6 +322,35 @@
       color: #7d5263;
     }
 
+    .booking-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+
+    .booking-step {
+      min-height: 54px;
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      padding: 8px 5px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 253, 249, 0.82);
+      color: var(--muted);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .booking-step b {
+      display: block;
+      color: var(--main);
+      font-size: 13px;
+    }
+
     .booking-calendar {
       display: grid;
       gap: 10px;
@@ -471,6 +500,16 @@
       font-weight: 900;
     }
 
+    .copy-bank {
+      min-height: 38px;
+      margin-top: 6px;
+      border: 1px solid rgba(191, 93, 134, 0.26);
+      border-radius: 999px;
+      background: var(--white);
+      color: var(--main);
+      font-weight: 950;
+    }
+
     .proof-preview {
       display: none;
       width: 100%;
@@ -507,6 +546,34 @@
       font-size: 13px;
       line-height: 1.55;
       font-weight: 780;
+    }
+
+    .appointment-summary {
+      display: grid;
+      gap: 8px;
+      margin: 10px 0;
+    }
+
+    .appointment-row {
+      display: grid;
+      gap: 2px;
+      padding: 9px 10px;
+      border: 1px solid rgba(191, 93, 134, 0.16);
+      border-radius: 12px;
+      background: rgba(255, 240, 246, 0.48);
+    }
+
+    .appointment-row span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .appointment-row b {
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 950;
     }
 
     .appointment-card .status {
@@ -722,6 +789,12 @@
     <section class="form-card" id="booking">
       <div class="form">
         <h2>客户预约</h2>
+        <div class="booking-steps" aria-label="预约流程">
+          <div class="booking-step"><b>1</b>选日期</div>
+          <div class="booking-step"><b>2</b>填资料</div>
+          <div class="booking-step"><b>3</b>付定金</div>
+          <div class="booking-step"><b>4</b>确认成功</div>
+        </div>
         <div class="grid-2">
           <div>
             <label for="name">姓名</label>
@@ -805,6 +878,7 @@
             <span>BSB: 013132</span>
             <span>ACCOUNT: 436090844</span>
           </div>
+          <button class="copy-bank" id="copyBankInfo" type="button">复制定金账号</button>
           <label for="paymentProof">上传付款截图</label>
           <input id="paymentProof" type="file" accept="image/*">
           <img class="proof-preview" id="paymentPreview" alt="付款截图预览">
@@ -1055,6 +1129,21 @@
       }
     }
 
+    async function copyBankInfo() {
+      const text = [
+        "Cc Nail 预约定金 $10",
+        "NAME: ZHU Q",
+        "BSB: 013132",
+        "ACCOUNT: 436090844"
+      ].join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        alert("定金账号已复制。");
+      } catch {
+        window.prompt("复制定金账号：", text);
+      }
+    }
+
     function escapeHtml(value) {
       return String(value || "")
         .replaceAll("&", "&amp;")
@@ -1082,19 +1171,24 @@
       box.classList.add("is-visible");
       box.innerHTML = `
         <h3>我的预约信息</h3>
-        <p>姓名：${escapeHtml(item.name)}</p>
-        <p>联系方式：${escapeHtml(item.contact)}</p>
-        <p>预约时间：${escapeHtml(formatDisplayDate(item.date))} ${escapeHtml(formatDisplayTime(item.time))}</p>
-        <p>项目：${escapeHtml(item.service)}</p>
-        <p>卸甲：${escapeHtml(item.removalNeed || "未填写")}</p>
-        <p>备注：${escapeHtml(item.styleNotes || item.notes || "无")}</p>
-        <p>${item.finalTotal ? "最终价格" : "预估总价"}：${escapeHtml(item.finalTotal || item.quoteTotal)} · 定金：${escapeHtml(item.depositReceived || item.quoteDeposit)} · 到店尾款：${escapeHtml(item.finalBalance || item.quoteBalance)}</p>
+        <div class="appointment-summary">
+          ${appointmentRow("预约时间", `${formatDisplayDate(item.date)} ${formatDisplayTime(item.time)}`)}
+          ${appointmentRow("姓名 / 联系方式", `${item.name || "未填写"} · ${item.contact || "未填写"}`)}
+          ${appointmentRow("项目", item.service || "待确认")}
+          ${appointmentRow("卸甲", item.removalNeed || "未填写")}
+          ${appointmentRow(item.finalTotal ? "最终价格" : "预估总价", `${item.finalTotal || item.quoteTotal || "待确认"} · 定金 ${item.depositReceived || item.quoteDeposit || "$10"} · 尾款 ${item.finalBalance || item.quoteBalance || "待确认"}`)}
+          ${appointmentRow("留言", item.styleNotes || item.notes || "无")}
+        </div>
         ${item.paymentProof ? `<p>付款截图：已上传</p>` : ""}
         ${item.adminNote ? `<p>确认备注：${escapeHtml(item.adminNote)}</p>` : ""}
         <span class="status">${escapeHtml(item.statusText || "预约已确认，已收到定金截图")}</span>
         <button type="button" id="refreshAppointmentStatus">刷新预约状态</button>
         <button type="button" id="changeAppointment">更改预约</button>
       `;
+    }
+
+    function appointmentRow(label, value) {
+      return `<div class="appointment-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value || "待确认")}</b></div>`;
     }
 
     function changeAppointment() {
@@ -1505,6 +1599,7 @@
     });
     setBookingAvailableState(null);
     ids("copyRequest").addEventListener("click", prepareDepositPayment);
+    ids("copyBankInfo").addEventListener("click", copyBankInfo);
     ids("confirmPayment").addEventListener("click", submitPaidBooking);
     ids("confirmOk").addEventListener("click", hideConfirmModal);
     ids("confirmModal").addEventListener("click", event => {
