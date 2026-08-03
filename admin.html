@@ -2286,6 +2286,7 @@
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxu8oO9FkcbnAXLeTq376WEjF03PWBer8_BxgK8pMHQ1nC_YtvuE26FJ37C3UKRKZqZ/exec";
     const APPOINTMENT_DEFAULT_TIME = "13:00";
     const CLOUD_BLOCK_SYNC_VERSION = "v25";
+    const CLOUD_CLEAR_BEFORE = "2026-08-03T12:00:00.000Z";
     const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
     const servicePresets = [
       ["本甲 $55", 55],
@@ -3115,6 +3116,12 @@
       return status === "cancelled" || status === "canceled" || notes.includes("已取消");
     }
 
+    function cloudItemBeforeClear(item = {}) {
+      const stamp = Date.parse(item.updatedAt || item.createdAt || "");
+      if (!Number.isFinite(stamp)) return true;
+      return stamp < Date.parse(CLOUD_CLEAR_BEFORE);
+    }
+
     function cloudItemStatus(item) {
       const status = String(item.status || "").toLowerCase();
       if (status === "paid") return "paid";
@@ -3197,7 +3204,7 @@
           service: record.service
         }) === cloudStableKey(item));
 
-        if (cloudItemDeleted(item)) {
+        if (cloudItemDeleted(item) || cloudItemBeforeClear(item)) {
           if (existing) {
             const index = next.findIndex(record => record.id === existing.id);
             if (index >= 0) {
